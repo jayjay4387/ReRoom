@@ -11,8 +11,8 @@ You are building **ReRoom**, a mobile app built with Expo (React Native) that le
 
 **What it does:**
 1. User takes a photo of their room
-2. Gemini (`gemini-3.1-flash-image-preview`, Nano Banana 2) generates two images: a chaos frame (mid-transformation) and a final redesigned room
-3. The **real photo (start frame)** and the **final redesign (end frame)** are sent to Higgsfield, which animates the transition into a cinematic video. The motion prompt creates the chaotic mid-transformation between the two frames.
+2. Gemini (`gemini-3.1-flash-image-preview`, Nano Banana 2) generates two images: a chaos frame (mid-transformation) and a final redesigned room — **4 candidates each, best one selected** (2K, 16:9, neutral background)
+3. The **real photo (start frame)** and the **final redesign (end frame)** are sent to Kling 3.0 (via eachlabs.ai), which animates the transition into a 7-second cinematic video. The motion prompt creates the chaotic mid-transformation between the two frames.
 4. User sees the storyboard (all 3 frames) and watches the video
 5. The redesign is saved on-device; the user can replay past redesigns from a gallery and save the video to their camera roll
 
@@ -24,8 +24,8 @@ You are building **ReRoom**, a mobile app built with Expo (React Native) that le
 - `expo-sharing` for the share sheet
 - `expo-media-library` for saving the video to the camera roll
 - `expo-file-system` + `@react-native-async-storage/async-storage` for on-device persistence
-- Google Gemini **`gemini-3.1-flash-image-preview`** (Nano Banana 2) for image generation — paid, no free tier; billing must be enabled
-- Higgsfield API via eachlabs.ai for video generation (**start frame + end frame**, 2 keyframes)
+- Google Gemini **`gemini-3.1-flash-image-preview`** (Nano Banana 2) for image generation — paid, no free tier; billing must be enabled. Generate **4 candidates per frame, pick best** (2K, 16:9, neutral background)
+- Video generation via eachlabs.ai — **Kling 3.0 model, 7 seconds, start frame + end frame, no multi-shot, no enhance**
 - API keys live server-side only (in API Routes) — never in client components
 
 ---
@@ -116,16 +116,16 @@ reroom/
 - Then calls `/api/generate-video` with the **start frame (real photo) + end frame (final redesign)**
 - Shows 4-step progress:
   1. "Analyzing your room..."
-  2. "Creating the chaos..."
-  3. "Designing your new space..."
-  4. "Rendering your transformation..."
+  2. "Creating the chaos..." (4 candidates generated, best selected)
+  3. "Designing your new space..." (4 candidates generated, best selected)
+  4. "Rendering your transformation..." (Kling 3.0, 7s)
 - Each step activates as the corresponding API call completes
 - Show frame thumbnails as they arrive — don't wait for everything
 - On completion: persist the redesign via `lib/storage.ts`, then navigate to `/result`
 
 ### `result.tsx` — Result Screen
 - StoryboardStrip at top showing all 3 frames with arrows between them
-- Video player below (expo-video, autoplay, looped)
+- 7-second video player below (expo-video, autoplay, looped)
 - 2-line redesign description from Gemini response
 - "Save to Photos" button via `expo-media-library`
 - "Share" button via `expo-sharing`
@@ -153,15 +153,21 @@ reroom/
 ```
 
 **What it does:**
-1. Calls Gemini (`gemini-3.1-flash-image-preview`) with the photo + style to generate Frame 2 (chaos)
-2. Calls Gemini (`gemini-3.1-flash-image-preview`) with the photo + style to generate Frame 3 (final redesign)
-3. Returns both images as base64
+1. Calls Gemini (`gemini-3.1-flash-image-preview`) to generate **4 candidate images** for Frame 2 (chaos), selects best
+2. Calls Gemini (`gemini-3.1-flash-image-preview`) to generate **4 candidate images** for Frame 3 (final redesign), selects best
+3. Returns both selected images as base64
+
+**Critical image generation requirements:**
+- **Minimum 2K resolution**
+- **16:9 ratio**
+- **Neutral background, nothing touching the edges of the frame**
+- The video is only as good as the frames — do not skip the 4-iteration selection step
 
 **Response:**
 ```typescript
 {
-  chaosFrame: string,    // base64 — storyboard only
-  finalFrame: string,    // base64 — also used as the video end frame
+  chaosFrame: string,    // base64, best of 4 candidates — storyboard only
+  finalFrame: string,    // base64, best of 4 candidates — also used as the video end frame
   description: string    // short redesign description for result screen
 }
 ```
@@ -169,10 +175,10 @@ reroom/
 **Gemini prompts:**
 
 Frame 2 (chaos):
-> "Generate an image of this exact room mid-transformation. Furniture is floating in mid-air, objects are displaced and hovering, everything is in dramatic cinematic disarray as if a wind is sweeping through. Keep the same room dimensions and walls."
+> "Generate an image of this exact room mid-transformation. Furniture is floating in mid-air, objects are displaced and hovering, everything is in dramatic cinematic disarray as if a wind is sweeping through. Keep the same room dimensions and walls. Clean neutral background, nothing touching the edges. 16:9 ratio, high detail, 2K resolution."
 
 Frame 3 (final):
-> "Generate an image of this exact room fully redesigned in [STYLE] style. Clean, intentional, beautifully decorated. Keep the same room dimensions, walls, windows, and doors."
+> "Generate an image of this exact room fully redesigned in [STYLE] style. Clean, intentional, beautifully decorated. Keep the same room dimensions, walls, windows, and doors. Clean neutral background, nothing touching the edges. 16:9 ratio, high detail, 2K resolution."
 
 ---
 
@@ -182,18 +188,21 @@ Frame 3 (final):
 ```typescript
 {
   startFrameBase64: string,  // Frame 1 — original room photo
-  endFrameBase64: string     // Frame 3 — final redesign
+  endFrameBase64: string     // Frame 3 — final redesign (best of 4 candidates)
 }
 ```
 
-> The chaos frame (Frame 2) is intentionally NOT sent. Higgsfield (and Kling/Luma) only accept
+> The chaos frame (Frame 2) is intentionally NOT sent. Kling 3.0 (and Higgsfield/Luma) only accept
 > 2 ordered keyframes; the chaos is created by the motion prompt between start and end.
 
 **What it does:**
-1. Submits the start + end frame to Higgsfield via eachlabs.ai
-2. Returns a job ID
-3. Client polls `GET /api/generate-video?jobId=xxx` every 3 seconds
-4. Returns video URL when complete
+1. Submits the start + end frame to eachlabs.ai
+2. Model: **Kling 3.0** — do not use any other model
+3. Duration: **7 seconds**
+4. No multi-shot, no enhance — keep settings clean
+5. Returns a job ID
+6. Client polls `GET /api/generate-video?jobId=xxx` every 3 seconds
+7. Returns video URL when complete
 
 **Motion prompt to pass to Higgsfield:**
 > "Cinematic room transformation. Objects float and swirl through the air in slow motion, then gracefully settle into a beautiful new arrangement. Warm dramatic lighting, smooth camera drift, satisfying resolution."
@@ -270,12 +279,14 @@ Access via `process.env.GEMINI_API_KEY` in API routes only. Never reference in a
 - No hardcoded API keys anywhere in the codebase
 - Don't send the chaos frame to the video API — it is storyboard-only
 - Don't over-engineer — this ships in 24 hours
+- Don't use any Higgsfield model other than Kling 3.0
+- Don't skip the 4-iteration frame selection — it directly affects video quality
 
 ---
 
 ## Definition of Done
 
-A judge picks up a phone, opens the app, photographs the room they're standing in, picks a style, waits ~60 seconds, watches a cinematic video of that room transforming, saves it to their camera roll, and sees it appear in the gallery. The app doesn't crash. The video plays. That's done.
+A judge picks up a phone, opens the app, photographs the room they're standing in, picks a style, waits ~60 seconds, watches a cinematic 7-second video of that room transforming, saves it to their camera roll, and sees it appear in the gallery. The app doesn't crash. The video plays. That's done.
 
 ---
 
@@ -288,10 +299,12 @@ A judge picks up a phone, opens the app, photographs the room they're standing i
    possible behavior changes. (The cheaper stable alternative is `gemini-2.5-flash-image` / Nano
    Banana 1, which has a ~500/day free tier and 1K output — keep it in mind as a fallback if the
    preview model's rate limits bite during team testing.)
-2. **Video pipeline:** Verified that Higgsfield, Kling, and Luma all cap at **2 ordered keyframes**
-   (start + end). The original "pass all 3 frames as keyframes" approach is not supported by any
-   mainstream provider. We now send **start = real photo, end = final redesign**, and let the
-   **motion prompt** create the chaos between them. The chaos frame stays as a storyboard artifact.
+2. **Video pipeline:** Chosen model is **Kling 3.0 via eachlabs.ai (7-second clip)**. Verified that
+   Kling, Higgsfield, and Luma all cap at **2 ordered keyframes** (start + end). The original "pass
+   all 3 frames as keyframes" approach is not supported by any mainstream provider. We now send
+   **start = real photo, end = final redesign**, and let the **motion prompt** create the chaos
+   between them. The chaos frame stays as a storyboard artifact. Frames are generated 4-candidates-
+   pick-best at 2K / 16:9 / neutral background (from PR #4) since video quality follows frame quality.
 3. **API routes / Expo Go:** Expo API Routes require a running server. In dev that's the machine
    running `npx expo start`; keep it up and on the same network as the demo phone.
 4. **Persistence + gallery (new scope):** Added on-device persistence (`expo-file-system` +
