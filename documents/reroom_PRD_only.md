@@ -7,18 +7,12 @@
 
 ## Key Technical Decisions (2026-05-30 revision)
 
-1. **Gemini image model corrected.** `gemini-2.0-flash` is a *text* model. Image generation now
-   lives on the **Nano Banana** line — we use **Nano Banana 2 (`gemini-3.1-flash-image-preview`)**
-   (image-in + text-prompt → edited-image-out, up to 4K, better text rendering, up to 14 reference
-   images). **No free tier — billing must be enabled day one** (~$0.067/image at 1024px). It is a
-   `-preview` model, so expect more restrictive rate limits; have a paid key ready for the team.
-2. **Video pipeline is start-frame + end-frame, NOT 3 keyframes.** Chosen model: **Kling 3.0 via
-   eachlabs.ai, 7-second clip.** No mainstream video model (Kling, Higgsfield, *or* Luma — all
-   verified) accepts 3 ordered keyframes in one generation; they cap at **2** (start + end). So the
-   transition video uses **Frame 1 (real photo) as the start** and **Frame 3 (final redesign) as
-   the end**, and the **motion prompt** creates the chaotic mid-transition. The chaos image
-   (Frame 2) is still generated and shown in the storyboard strip — it is just **not** a video
-   keyframe.
+1. **Gemini image model.** We use **Nano Banana 2 (`gemini-3.1-flash-image-preview`)** for image
+   generation. **No free tier — billing required day one.** Preview model; have a paid key ready.
+2. **Video pipeline is start-frame + end-frame only.** Kling 3.0 (via eachlabs.ai) caps at 2
+   keyframes. **Frame 1 (real photo) = start, Frame 3 (final redesign) = end.** The motion prompt
+   creates the chaotic mid-transformation between them. The chaos frame (Frame 2) is still generated
+   by Gemini and shown in the storyboard strip — it is just not a video keyframe.
 3. **Expo API Routes need a running server.** During the hackathon that's the dev machine running
    `npx expo start`; the phone reaches the routes over the LAN. Keep the laptop up and on the same
    network during the demo. (No standalone Expo Go build bakes in the keys.)
@@ -39,9 +33,7 @@ NativeWind v4 are all current.
 
 **Name:** ReRoom
 **Tagline:** *Point. Redesign. Watch it happen.*
-**Core idea:** User scans their room → Gemini generates a chaos frame and a final redesign frame →
-the real photo and the final redesign are sent to Kling 3.0 (via eachlabs.ai) as start/end frames →
-cinematic 7-second transition video of the room transforming. Every redesign is saved to the cloud and shown in a public community gallery.
+**Core idea:** User scans their room → Gemini generates a chaos frame and a final redesign frame → the real photo and the final redesign are sent to Kling 3.0 (via eachlabs.ai) as start/end frames → cinematic 7-second transition video of the room transforming. Every redesign is saved to the cloud and shown in a public community gallery.
 
 ---
 
@@ -50,13 +42,13 @@ cinematic 7-second transition video of the room transforming. Every redesign is 
 1. **Scan** — User opens app, taps a button to open the native camera via `expo-image-picker`. Real viewfinder, feels like a proper camera app.
 2. **Style Select** — User picks a vibe: Minimal / Cozy / Modern / Maximalist (simple 4-button selector)
 3. **Frame Generation (image pipeline via Gemini)** — App sends the original photo + selected style to Gemini (`gemini-3.1-flash-image-preview`, Nano Banana 2). Gemini generates two images:
-   - **Frame 2 (Chaos):** The room mid-transition — furniture floating, objects displaced, everything in dramatic mid-air disarray. Used in the storyboard strip (not as a video keyframe).
-   - **Frame 3 (Final):** The fully redesigned room in the selected style. Clean, intentional, complete transformation.
+   - **Frame 2 (Chaos):** The room mid-transformation — furniture floating, objects in dramatic disarray. Shown in the storyboard strip; not a video keyframe.
+   - **Frame 3 (Final Redesign):** The fully redesigned room in the selected style. Clean, intentional, complete transformation.
 4. **3-frame storyboard** — App now has 3 frames:
    - Frame 1: User's real photo (current room)
-   - Frame 2: AI-generated chaos/transition state
+   - Frame 2: AI-generated chaos/transition state (storyboard only)
    - Frame 3: AI-generated final redesign
-5. **Transition video** — **Frame 1 (start) + Frame 3 (end)** + a motion prompt are sent to Kling 3.0 (via eachlabs.ai). It animates from the real room to the final redesign as a 7-second clip; the motion prompt ("objects float and swirl, then settle") creates the chaotic mid-transformation between the two keyframes.
+5. **Transition video** — **Frame 1 (start) + Frame 3 (end)** + a motion prompt are sent to Kling 3.0 (via eachlabs.ai). It animates from the real room to the final redesign as a 7-second clip; the motion prompt creates the chaotic mid-transformation between the two keyframes.
 6. **Result screen** — Shows the 3 frames as a storyboard strip and the full generated video below it. Save-to-camera-roll + share buttons. The redesign is automatically uploaded to Cloudinary + MongoDB and posted to the community gallery.
 7. **Community gallery** — A public feed (from MongoDB) of everyone's redesigns; tap any one to replay its storyboard + video.
 
@@ -122,7 +114,7 @@ The video is only as good as the start and end frames. Invest generation time he
 - No multi-shot, no enhance — keep it clean
 - **Mode: image-to-video with start + end frame (2 keyframes max).**
 - Input: **Frame 1 (real photo) as the start frame, Frame 3 (final redesign) as the end frame.** The chaos frame (Frame 2) is **not** sent — it cannot be a middle keyframe. Verified: Kling 3.0 (and Higgsfield, and Luma) all cap at 2 ordered keyframes; none accept a 3-keyframe sequence.
-- Motion prompt: *"Cinematic room transformation. Objects float and swirl through the air in slow motion, then gracefully settle into a beautiful new arrangement. Warm dramatic lighting, smooth camera drift, satisfying resolution."* — this prompt is what produces the chaotic mid-transition between the two keyframes.
+- Motion prompt: *"Cinematic room transformation. The space dissolves and rebuilds itself — furniture morphs, materials shift, colors bleed into new ones — in a slow, dramatic sweep. Warm golden lighting pulses through the room as it transforms. Smooth camera drift, dust particles floating in the light, satisfying reveal at the end."* — this prompt is what produces the chaotic mid-transition between the two keyframes; tune it aggressively if the output looks too static.
 - Output: 7-second MP4 transition video (real room → chaotic motion → final redesign)
 - Note: Generation is async — poll for completion every 3 seconds, show a loading state
 
@@ -260,5 +252,5 @@ Set up a free **MongoDB Atlas** cluster and a free **Cloudinary** account; put t
 ## What Success Looks Like at Demo
 
 A judge picks up a phone, opens the app, takes a photo of the room they're standing in, picks "Modern", waits ~60 seconds, and watches a cinematic 7-second video of that exact room transforming in front of their eyes — then saves it to their camera roll and sees it land in the gallery.
-
+yo
 That's the demo. Everything else is secondary.
