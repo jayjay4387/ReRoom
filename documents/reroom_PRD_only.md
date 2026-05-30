@@ -22,10 +22,13 @@
 3. **Expo API Routes need a running server.** During the hackathon that's the dev machine running
    `npx expo start`; the phone reaches the routes over the LAN. Keep the laptop up and on the same
    network during the demo. (No standalone Expo Go build bakes in the keys.)
-4. **NEW — on-device persistence + gallery (scope addition).** The original draft was
-   session-only. We now: (a) save the final video to the phone's camera roll, and (b) keep a
-   persistent in-app gallery of past redesigns on the device. No accounts, no server DB — purely
-   local storage. See **Storage & Persistence** below.
+4. **NEW — cloud storage + public community gallery (scope addition, MongoDB showcase).** The
+   original draft was session-only. We now persist every redesign to the cloud: **files (3 frames +
+   video) → Cloudinary, metadata + URLs → MongoDB Atlas**, surfaced in a **public community feed**
+   (`/gallery`) every device sees. Chosen to qualify for the "best use of MongoDB" prize and for a
+   stronger live demo. No auth. Files never go in Mongo (no GridFS) — documents in Mongo, blobs in
+   Cloudinary. The final video can also be saved to the phone's camera roll. See **Cloud Storage &
+   Community Gallery** below.
 
 Also bumped: **Expo SDK 51 → 54/55**; `expo-video`, `expo-image-picker`, `expo-sharing`,
 NativeWind v4 are all current.
@@ -38,7 +41,7 @@ NativeWind v4 are all current.
 **Tagline:** *Point. Redesign. Watch it happen.*
 **Core idea:** User scans their room → Gemini generates a chaos frame and a final redesign frame →
 the real photo and the final redesign are sent to Kling 3.0 (via eachlabs.ai) as start/end frames →
-cinematic 7-second transition video of the room transforming. Past redesigns are saved on the device.
+cinematic 7-second transition video of the room transforming. Every redesign is saved to the cloud and shown in a public community gallery.
 
 ---
 
@@ -54,8 +57,8 @@ cinematic 7-second transition video of the room transforming. Past redesigns are
    - Frame 2: AI-generated chaos/transition state
    - Frame 3: AI-generated final redesign
 5. **Transition video** — **Frame 1 (start) + Frame 3 (end)** + a motion prompt are sent to Kling 3.0 (via eachlabs.ai). It animates from the real room to the final redesign as a 7-second clip; the motion prompt ("objects float and swirl, then settle") creates the chaotic mid-transformation between the two keyframes.
-6. **Result screen** — Shows the 3 frames as a storyboard strip and the full generated video below it. Save-to-camera-roll + share buttons. The redesign is automatically saved to the on-device gallery.
-7. **Gallery** — User can revisit any past redesign from a persistent on-device gallery and replay its storyboard + video.
+6. **Result screen** — Shows the 3 frames as a storyboard strip and the full generated video below it. Save-to-camera-roll + share buttons. The redesign is automatically uploaded to Cloudinary + MongoDB and posted to the community gallery.
+7. **Community gallery** — A public feed (from MongoDB) of everyone's redesigns; tap any one to replay its storyboard + video.
 
 ---
 
@@ -69,8 +72,9 @@ cinematic 7-second transition video of the room transforming. Past redesigns are
 | Camera | `expo-image-picker` for native camera viewfinder |
 | Room analysis + image generation | Google Gemini **`gemini-3.1-flash-image-preview`** (Nano Banana 2 — native image output, paid/no free tier) |
 | Transition video | eachlabs.ai — **Kling 3.0 model, 7 seconds, start frame + end frame** (no multi-shot, no enhance) |
-| API layer | Expo API Routes to keep API keys off the client (served by the running dev server) |
-| On-device storage | `expo-file-system` (image/video files) + `AsyncStorage` (gallery metadata) |
+| API layer | Expo API Routes to keep API keys + DB/Cloudinary creds off the client (served by the running dev server) |
+| File storage | **Cloudinary** — the 3 frames + 7s video; returns CDN URLs |
+| Database / gallery | **MongoDB Atlas** — one document per redesign (style, description, Cloudinary URLs, createdAt); powers the public community feed |
 | Save / share | `expo-media-library` (save to camera roll), `expo-sharing` (share sheet) |
 | Video playback | `expo-video` |
 | Testing on device | Expo Go (scan QR code, instant live reload) — dev server must stay running |
@@ -110,7 +114,7 @@ cinematic 7-second transition video of the room transforming. Past redesigns are
 - Output: Best of 4 generated images of the fully redesigned room (Frame 3)
 
 ### Frame Quality Note
-The video is only as good as the start and end frames. Invest generation time here — do not skip the 4-iteration selection step. A weak Frame 3 means a weak video regardless of how good Higgsfield is.
+The video is only as good as the start and end frames. Invest generation time here — do not skip the 4-iteration selection step. A weak Frame 3 means a weak video regardless of how good the video model (Kling 3.0) is.
 
 ### 3. Video API — Kling 3.0 (via eachlabs.ai)
 - Model: **Kling 3.0**
@@ -124,19 +128,28 @@ The video is only as good as the start and end frames. Invest generation time he
 
 ---
 
-## Storage & Persistence
+## Cloud Storage & Community Gallery
 
-No accounts, no server-side database. Everything is stored **locally on the device.**
+No accounts/auth, but redesigns are **persisted to the cloud** (not session-only) so every device
+sees a shared community feed. This is also the project's MongoDB showcase.
 
-- **Binaries** (3 frame images + the video file) are written to `expo-file-system`'s
-  `documentDirectory`. The Gemini frames arrive as base64 (written straight to disk); the
-  Higgsfield video arrives as a URL (downloaded via `FileSystem.downloadAsync`).
-- **Metadata** (an array of `{ id, style, createdAt, framePaths[], videoPath }`) is stored in
-  `AsyncStorage` as JSON — the gallery index.
-- On the result screen, the user can also **save the video to the phone's camera roll** via
-  `expo-media-library` (asks permission once).
-- A redesign is persisted automatically when generation completes, so a reload or crash never
-  loses the demo result.
+- **Files → Cloudinary.** The 3 frame images + the 7s video are uploaded to Cloudinary (from a
+  server-side API route), which returns CDN URLs that stream straight into `expo-video` / `<Image>`.
+  Files are **not** stored in MongoDB.
+- **Metadata → MongoDB Atlas.** One document per redesign in a `redesigns` collection:
+  `{ _id, style, description, frameUrls[3], videoUrl, createdAt }`. Mongo stores *where* the files
+  are (Cloudinary URLs) and the queryable metadata — this is the correct split (documents in Mongo,
+  blobs in object storage; no GridFS).
+- **Community feed.** `/gallery` shows **everyone's** redesigns, newest first
+  (`find().sort({ createdAt: -1 })`). The feed fills up live as people use the app — a strong demo
+  and a genuine use of MongoDB. No auth; all redesigns are public.
+- **Persistence flow.** On generation-complete the client calls `POST /api/save-redesign`
+  (uploads files to Cloudinary, inserts the Mongo document). Non-blocking: if it fails, the user
+  still sees their result.
+- **Camera roll.** On the result screen the user can also **save the video to the phone's camera
+  roll** via `expo-media-library` (asks permission once).
+- **On-device cache (optional).** `AsyncStorage` may cache the current session's result for instant
+  replay; it is not the source of truth — the gallery always reads from MongoDB.
 
 ---
 
@@ -173,28 +186,30 @@ No accounts, no server-side database. Everything is stored **locally on the devi
 - Short description of the redesign style
 - **"Save to Photos"** button via `expo-media-library`
 - **"Share"** button via `expo-sharing`
-- "Try another room" button → back to `/scan` (past redesigns remain in the gallery)
+- "Try another room" button → back to `/scan` (the redesign is already saved to the community gallery)
 
-### `/gallery` — Saved Redesigns
-- Grid of past redesigns (thumbnail + style + date), newest first
-- Tap a redesign → replay its full storyboard strip + video
-- Empty state when nothing saved yet
-- Delete option per item
+### `/gallery` — Community Gallery (public feed)
+- Shows **everyone's** redesigns from MongoDB (`GET /api/gallery`), newest first
+- Grid of cards (Cloudinary thumbnail + style + date)
+- Tap a redesign → replay its full storyboard strip + video from Cloudinary URLs
+- Pull-to-refresh; empty state before any redesigns exist
+- No auth — the feed is public; no delete in MVP
 
 ---
 
 ## Team Split (4 people, 24 hours)
 
 > 2 of the 4 are more technical; they own the API integrations and the shared scaffolds
-> (RoomContext shape, storage layer, API route contracts) so the other two can build screens
-> against typed seams from hour one.
+> (RoomContext shape, MongoDB/Cloudinary layer, API route contracts) so the other two can build
+> screens against typed seams from hour one.
 
 | Person | Responsibility |
 |---|---|
-| 2 | Home, style picker, result screen, **gallery screen** UI |
+| 1 | Camera screen + image picker + `/scan` flow |
+| 2 | Home, style picker, result screen, **community gallery screen** UI |
 | 3 (technical) | Gemini API integration (Frame 2 + Frame 3 generation, 4-iteration selection) |
-| 4 (technical) | Video API integration (Kling 3.0, 7s) + video playback + **on-device storage layer** |
-| Tech lead | Floating — owns shared scaffolds (RoomContext, storage module, API route contracts), unblocks everyone, owns the riskiest path (video generation) |
+| 4 (technical) | Video API (Kling 3.0, 7s) + video playback + **MongoDB + Cloudinary layer** (`save-redesign`, `gallery` routes) |
+| Tech lead | Floating — owns shared scaffolds (RoomContext, MongoDB/Cloudinary modules, API route contracts), unblocks everyone, owns the riskiest path (video generation) |
 
 ---
 
@@ -203,9 +218,14 @@ No accounts, no server-side database. Everything is stored **locally on the devi
 ```
 GEMINI_API_KEY=
 EACHLABS_API_KEY=
+MONGODB_URI=
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
 ```
 
-Store in `.env` at project root. Access via `process.env.GEMINI_API_KEY` in API routes. Never reference directly in client-side component code.
+Store in `.env` at project root. Access via `process.env.*` in API routes only. The `MONGODB_URI`
+and Cloudinary secrets must never reach the client — all DB and upload work happens in `/app/api/`.
 
 ---
 
@@ -215,21 +235,25 @@ Store in `.env` at project root. Access via `process.env.GEMINI_API_KEY` in API 
 npx create-expo-app reroom
 cd reroom
 npx expo install expo-image-picker expo-video expo-sharing nativewind \
-  expo-file-system expo-media-library @react-native-async-storage/async-storage
+  expo-media-library @react-native-async-storage/async-storage
+# server-side deps for the API routes (MongoDB + Cloudinary):
+npm install mongodb cloudinary
 ```
 
-Everyone installs **Expo Go** on their phones. Run `npx expo start`, scan the QR code, app is live.
-**Keep the dev server running** — the API routes are served by it.
+Set up a free **MongoDB Atlas** cluster and a free **Cloudinary** account; put their credentials in
+`.env` (see Environment Variables). Everyone installs **Expo Go** on their phones. Run
+`npx expo start`, scan the QR code, app is live. **Keep the dev server running** — the API routes
+(which talk to Gemini, eachlabs, MongoDB, and Cloudinary) are served by it.
 
 ---
 
 ## MVP Constraints (24hr scope)
 
 - iOS and Android via Expo Go — no need for a production build during the hackathon
-- No user accounts and no server-side database — but redesigns **are** persisted locally on the device (see Storage & Persistence)
+- No user accounts / no auth — but redesigns **are** persisted to the cloud (MongoDB Atlas + Cloudinary) and shown in a public community gallery (see Cloud Storage & Community Gallery)
 - No real-time room scanning — a single photo is enough
-- If Higgsfield generation takes >60s, show a "still rendering" state with an animated progress indicator
-- Error states: if any API fails, show a friendly message and a retry button
+- If video generation takes >60s, show a "still rendering" state with an animated progress indicator
+- Error states: if any API fails, show a friendly message and a retry button. Cloud-save failures are non-blocking — the user still sees their video.
 
 ---
 
