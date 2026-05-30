@@ -301,6 +301,8 @@ Access via `process.env.*` in API routes only. Never reference in any component 
 `MONGODB_URI` and Cloudinary secrets must never reach the client — all DB/upload work happens in
 `/app/api/` routes.
 
+**Never read the `.env` file directly** — do not use Read, cat, or any tool to view its contents. API keys are confidential and must never appear in conversation context.
+
 ---
 
 ## Error Handling
@@ -324,6 +326,7 @@ Access via `process.env.*` in API routes only. Never reference in any component 
 - No web-only browser APIs (`window.localStorage`, `document`, `window`)
 - No skipping loading states — every async operation needs visual feedback
 - No hardcoded API keys anywhere in the codebase
+- Never read the `.env` file — not with Read, cat, or any shell command
 - Don't send the chaos frame to the video API — it is storyboard-only
 - Don't over-engineer — this ships in 24 hours
 - Don't use any video model other than Kling 3.0 (via eachlabs)
