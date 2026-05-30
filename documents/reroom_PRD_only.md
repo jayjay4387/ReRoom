@@ -35,7 +35,7 @@
 | Styling | NativeWind (Tailwind class names in React Native) |
 | Camera | `expo-image-picker` for native camera viewfinder |
 | Room analysis + image generation | Google Gemini (gemini-2.0-flash or equivalent with image output) |
-| Transition video | Higgsfield image-to-video API via eachlabs.ai |
+| Transition video | Higgsfield API via eachlabs.ai — Kling 3.0 model, 7 seconds |
 | API layer | Expo API Routes or lightweight Express server to keep API keys off the client |
 | Testing on device | Expo Go app (scan QR code, instant live reload) |
 | Deployment | EAS Build (Expo Application Services) |
@@ -59,19 +59,29 @@
 
 ### 1. Gemini — Frame 2 (Chaos State)
 - Input: base64 original room photo + selected style
-- Prompt: *"Generate an image of this exact room mid-transformation. Furniture is floating in mid-air, objects are displaced and hovering, everything is in dramatic cinematic disarray as if a wind is sweeping through. Keep the same room dimensions and walls. This is the chaos frame of a room makeover transition."*
-- Output: Generated image of the room in chaos (Frame 2)
+- **Output resolution: 2K minimum, 16:9 ratio, neutral background — nothing touching the edges**
+- Generate 4 candidate images, select the best one before proceeding — frame quality directly determines video quality
+- Prompt: *"Generate an image of this exact room mid-transformation. Furniture is floating in mid-air, objects are displaced and hovering, everything is in dramatic cinematic disarray as if a wind is sweeping through. Keep the same room dimensions and walls. Clean neutral background, nothing touching the edges of the frame. 16:9 ratio, high detail, 2K resolution."*
+- Output: Best of 4 generated images of the room in chaos (Frame 2)
 
 ### 2. Gemini — Frame 3 (Final Redesign)
 - Input: base64 original room photo + selected style
-- Prompt: *"Generate an image of this exact room fully redesigned in [STYLE] style. Clean, intentional, beautifully decorated. Keep the same room dimensions, walls, windows, and doors. This is the final transformed version of the room."*
-- Output: Generated image of the fully redesigned room (Frame 3)
+- **Output resolution: 2K minimum, 16:9 ratio, neutral background — nothing touching the edges**
+- Generate 4 candidate images, select the best one before proceeding — this is the most important frame, it's what the user sees last
+- Prompt: *"Generate an image of this exact room fully redesigned in [STYLE] style. Clean, intentional, beautifully decorated. Keep the same room dimensions, walls, windows, and doors. Clean neutral background, nothing touching the edges. 16:9 ratio, high detail, 2K resolution."*
+- Output: Best of 4 generated images of the fully redesigned room (Frame 3)
+
+### Frame Quality Note
+The video is only as good as the start and end frames. Invest generation time here — do not skip the 4-iteration selection step. A weak Frame 3 means a weak video regardless of how good Higgsfield is.
 
 ### 3. Higgsfield API (via eachlabs.ai)
+- Model: **Kling 3.0**
+- Video length: **7 seconds**
+- No multi-shot, no enhance — keep it clean
 - Input: 3 frames in sequence — Frame 1 (real photo), Frame 2 (chaos), Frame 3 (final redesign)
 - Higgsfield supports multi-frame and multimodal inputs natively — pass all 3 as consecutive keyframes in a single generation pipeline
 - Motion prompt: *"Cinematic room transformation. Objects float and swirl through the air in slow motion, then gracefully settle into a beautiful new arrangement. Warm dramatic lighting, smooth camera drift, satisfying resolution."*
-- Output: MP4 transition video animating between all 3 frames
+- Output: 7-second MP4 transition video animating between all 3 frames
 - Note: Generation is async — poll for completion every 3 seconds, show a loading state
 
 ---
@@ -97,15 +107,15 @@
 ### `/generating` — Loading Screen
 - 4 step progress indicator:
   - Step 1: "Analyzing your room..." (Gemini reads the photo)
-  - Step 2: "Creating the chaos..." (Gemini generates Frame 2)
-  - Step 3: "Designing your new space..." (Gemini generates Frame 3)
-  - Step 4: "Rendering your transformation..." (Higgsfield animates all 3 frames)
-- Estimated wait: ~45-90 seconds total
+  - Step 2: "Creating the chaos..." (Gemini generates 4x Frame 2 candidates, picks best)
+  - Step 3: "Designing your new space..." (Gemini generates 4x Frame 3 candidates, picks best)
+  - Step 4: "Rendering your transformation..." (Higgsfield animates all 3 frames, Kling 3.0, 7s)
+- Estimated wait: ~60-90 seconds total
 - Show storyboard frames progressively as each one completes — don't wait for everything
 
 ### `/result` — Result Screen
 - 3-frame storyboard strip at top: Frame 1 (current) → Frame 2 (chaos) → Frame 3 (redesigned)
-- Full transition video below, autoplaying and looped via `expo-video`
+- Full 7-second transition video below, autoplaying and looped via `expo-video`
 - Short description of the redesign style
 - Share button via `expo-sharing`
 - "Try another room" button → back to `/scan`
@@ -118,8 +128,8 @@
 |---|---|
 | 1 | Camera screen + image picker + `/scan` flow |
 | 2 | Home, style picker, result screen UI |
-| 3 | Gemini API integration (Frame 2 + Frame 3 generation) |
-| 4 | Higgsfield API integration + video playback on result screen |
+| 3 | Gemini API integration (Frame 2 + Frame 3 generation, 4-iteration selection) |
+| 4 | Higgsfield API integration (Kling 3.0, 7s) + video playback on result screen |
 
 ---
 
@@ -158,6 +168,6 @@ Everyone installs **Expo Go** on their phones. Run `npx expo start`, scan the QR
 
 ## What Success Looks Like at Demo
 
-A judge picks up a phone, opens the app, takes a photo of the room they're standing in, picks "Modern", waits 45 seconds, and watches a cinematic video of that exact room transforming in front of their eyes.
+A judge picks up a phone, opens the app, takes a photo of the room they're standing in, picks "Modern", waits 60 seconds, and watches a cinematic 7-second video of that exact room transforming in front of their eyes.
 
 That's the demo. Everything else is secondary.
