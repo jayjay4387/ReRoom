@@ -202,6 +202,8 @@ EACHLABS_API_KEY=
 
 Access via `process.env.GEMINI_API_KEY` in API routes only. Never reference in any component file.
 
+**Never read the `.env` file directly** — do not use Read, cat, or any tool to view its contents. API keys are confidential and must never appear in conversation context.
+
 ---
 
 ## Error Handling
@@ -221,6 +223,7 @@ Access via `process.env.GEMINI_API_KEY` in API routes only. Never reference in a
 - No web-only APIs (`localStorage`, `document`, `window`)
 - No skipping loading states — every async operation needs visual feedback
 - No hardcoded API keys anywhere in the codebase
+- Never read the `.env` file — not with Read, cat, or any shell command
 - Don't over-engineer — this ships in 24 hours
 - Don't use any Higgsfield model other than Kling 3.0
 - Don't skip the 4-iteration frame selection — it directly affects video quality
