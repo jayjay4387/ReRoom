@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useRoom } from '../context/RoomContext';
 import { apiUrl } from '../lib/api';
+import { saveRedesign } from '../lib/redesigns';
 import ProgressSteps from '../components/ProgressSteps';
 
 const STEPS = [
@@ -69,6 +70,11 @@ export default function GeneratingScreen() {
 
       const videoUrl = await pollVideo(jobId);
       setVideoUrl(videoUrl);
+
+      // Persist to the gallery — non-blocking: the user still sees their result if this fails.
+      saveRedesign({ originalUrl, chaosUrl, finalUrl, videoUrl, style, description: frames.description ?? '' })
+        .catch((err) => console.warn('[save-redesign] failed (non-blocking):', err));
+
       router.push('/result');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Something went wrong');
