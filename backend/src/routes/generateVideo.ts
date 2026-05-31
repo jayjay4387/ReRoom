@@ -3,9 +3,9 @@ import { videoMotionPrompt } from '../prompts';
 
 export async function submitVideo(req: Request, res: Response): Promise<void> {
   try {
-    const { startFrameBase64, endFrameBase64 } = req.body as {
-      startFrameBase64: string;
-      endFrameBase64: string;
+    const { startFrameUrl, endFrameUrl } = req.body as {
+      startFrameUrl: string;
+      endFrameUrl: string;
     };
 
     const apiKey = process.env.EACHLABS_API_KEY;
@@ -22,8 +22,8 @@ export async function submitVideo(req: Request, res: Response): Promise<void> {
         enhance: false,
         prompt: videoMotionPrompt,
         keyframes: [
-          { image: startFrameBase64 },
-          { image: endFrameBase64 },
+          { image: startFrameUrl },
+          { image: endFrameUrl },
         ],
       }),
     });
