@@ -1,10 +1,16 @@
-import { View, Text, Image } from 'react-native';
+import { View, Text, Image, StyleSheet } from 'react-native';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { useRoom } from '../context/RoomContext';
+import { BlurView } from 'expo-blur';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import Alert01Icon from '@hugeicons/core-free-icons/Alert01Icon';
+import SkyBackground from '../components/aero/SkyBackground';
+import { GlassButtonGhost } from '../components/aero/GlassButton';
 import { apiUrl } from '../lib/api';
 import { saveRedesign } from '../lib/redesigns';
 import ProgressSteps from '../components/ProgressSteps';
+import { useRoom } from '../context/RoomContext';
+import { GLASS } from '../constants/theme';
 
 const STEPS = [
   'Analyzing your room...',
@@ -21,9 +27,7 @@ export default function GeneratingScreen() {
   const [finalPreview, setFinalPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    run();
-  }, []);
+  useEffect(() => { run(); }, []);
 
   const run = async () => {
     try {
@@ -82,24 +86,161 @@ export default function GeneratingScreen() {
 
   if (error) {
     return (
-      <View className="flex-1 bg-black items-center justify-center px-6">
-        <Text className="text-white text-lg text-center mb-4">{error}</Text>
-        <Text className="text-gray-400 text-sm text-center">Please try again</Text>
-      </View>
+      <SkyBackground>
+        <View style={styles.center}>
+          <View style={styles.errorShadow}>
+            <BlurView intensity={28} tint="light" style={styles.errorCard}>
+              <HugeiconsIcon icon={Alert01Icon} size={36} color="#CC2200" />
+              <Text style={styles.errorTitle}>Something went wrong</Text>
+              <Text style={styles.errorBody}>{error}</Text>
+              <GlassButtonGhost
+                label="Try again"
+                onPress={() => { setError(null); setStep(0); run(); }}
+                style={styles.retryBtn}
+              />
+            </BlurView>
+          </View>
+        </View>
+      </SkyBackground>
     );
   }
 
   return (
-    <View className="flex-1 bg-black px-6 pt-16">
-      <ProgressSteps steps={STEPS} current={step} />
-      <View className="flex-row mt-10 gap-3">
-        {chaosPreview && (
-          <Image source={{ uri: chaosPreview }} className="flex-1 h-32 rounded-xl" resizeMode="cover" />
-        )}
-        {finalPreview && (
-          <Image source={{ uri: finalPreview }} className="flex-1 h-32 rounded-xl" resizeMode="cover" />
+    <SkyBackground>
+      <View style={styles.center}>
+        {/* Main progress card */}
+        <View style={styles.cardShadow}>
+          <BlurView intensity={28} tint="light" style={styles.card}>
+            <Text style={styles.cardTitle}>Transforming your room</Text>
+            <Text style={styles.cardSubtitle}>This takes about a minute — hang tight</Text>
+            <View style={styles.divider} />
+            <ProgressSteps steps={STEPS} current={step} />
+          </BlurView>
+        </View>
+
+        {/* Frame thumbnails — fade in as each arrives (Cloudinary URLs) */}
+        {(chaosPreview || finalPreview) && (
+          <View style={styles.thumbRow}>
+            {chaosPreview && (
+              <View style={styles.thumbFrame}>
+                <Image
+                  source={{ uri: chaosPreview }}
+                  style={styles.thumb}
+                  resizeMode="cover"
+                />
+              </View>
+            )}
+            {finalPreview && (
+              <View style={styles.thumbFrame}>
+                <Image
+                  source={{ uri: finalPreview }}
+                  style={styles.thumb}
+                  resizeMode="cover"
+                />
+              </View>
+            )}
+          </View>
         )}
       </View>
-    </View>
+    </SkyBackground>
   );
 }
+
+const styles = StyleSheet.create({
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 60,
+  },
+
+  // progress card
+  cardShadow: {
+    width: '100%',
+    borderRadius: 22,
+    shadowColor: '#143C5A',
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  card: {
+    borderRadius: 22,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: GLASS.border,
+    backgroundColor: GLASS.fill,
+    padding: 22,
+    gap: 4,
+  },
+  cardTitle: {
+    color: GLASS.textDark,
+    fontSize: 17,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  cardSubtitle: {
+    color: 'rgba(15,59,85,0.55)',
+    fontSize: 12,
+    fontWeight: '400',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(180,230,255,0.5)',
+    marginVertical: 14,
+  },
+
+  // frame thumbnails
+  thumbRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+    width: '100%',
+  },
+  thumbFrame: {
+    flex: 1,
+    height: 100,
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.75)',
+    shadowColor: '#143C5A',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  thumb: { width: '100%', height: '100%' },
+
+  // error card
+  errorShadow: {
+    width: '100%',
+    borderRadius: 22,
+    shadowColor: '#CC2200',
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  errorCard: {
+    borderRadius: 22,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: GLASS.border,
+    backgroundColor: GLASS.fill,
+    padding: 28,
+    alignItems: 'center',
+    gap: 8,
+  },
+  errorTitle: {
+    color: GLASS.textDark,
+    fontSize: 16,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  errorBody: {
+    color: 'rgba(15,59,85,0.6)',
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  retryBtn: { width: '80%' },
+});
