@@ -27,9 +27,16 @@ export default function GeneratingScreen() {
 
   useEffect(() => { run(); }, []);
 
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
   const run = async () => {
     try {
+      // Step 1: brief "analyzing" moment so the indicator is visible before the request fires
       setStep(1);
+      await sleep(600);
+
+      // Step 2: show "Creating the chaos..." while the frames request is in-flight
+      setStep(2);
       const framesRes = await fetch('/api/generate-frames', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -38,23 +45,27 @@ export default function GeneratingScreen() {
       if (!framesRes.ok) throw new Error(`generate-frames ${framesRes.status}`);
       const frames = await framesRes.json();
 
-      setStep(2);
+      // Chaos thumbnail appears first — let it render before the final frame
       setChaosPreview(frames.chaosFrame);
       setChaosFrame(frames.chaosFrame);
 
+      // Step 3: "Designing your new space..." — brief pause so chaos thumbnail is seen alone
       setStep(3);
+      await sleep(500);
+
       setFinalPreview(frames.finalFrame);
       setFinalFrame(frames.finalFrame);
       setDescription(frames.description);
+      await sleep(300);
 
+      // Step 4: "Rendering your transformation..." — submit video job and poll
       setStep(4);
       const videoRes = await fetch('/api/generate-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          frame1Base64: photo?.base64,
-          frame2Base64: frames.chaosFrame,
-          frame3Base64: frames.finalFrame,
+          startFrameBase64: photo?.base64,
+          endFrameBase64: frames.finalFrame,
         }),
       });
       if (!videoRes.ok) throw new Error(`generate-video ${videoRes.status}`);
@@ -91,7 +102,7 @@ export default function GeneratingScreen() {
               <Text style={styles.errorBody}>{error}</Text>
               <GlassButtonGhost
                 label="Try again"
-                onPress={() => { setError(null); setStep(0); run(); }}
+                onPress={() => { setError(null); setStep(0); setChaosPreview(null); setFinalPreview(null); run(); }}
                 style={styles.retryBtn}
               />
             </BlurView>
