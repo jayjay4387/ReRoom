@@ -2,6 +2,7 @@ import { View, Text, Image } from 'react-native';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useRoom } from '../context/RoomContext';
+import { apiUrl } from '../lib/api';
 import ProgressSteps from '../components/ProgressSteps';
 
 const STEPS = [
@@ -26,7 +27,7 @@ export default function GeneratingScreen() {
   const run = async () => {
     try {
       setStep(1);
-      const framesRes = await fetch('/api/generate-frames', {
+      const framesRes = await fetch(apiUrl('/api/generate-frames'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageBase64: photo?.base64, style }),
@@ -44,7 +45,7 @@ export default function GeneratingScreen() {
       setDescription(frames.description);
 
       setStep(4);
-      const videoRes = await fetch('/api/generate-video', {
+      const videoRes = await fetch(apiUrl('/api/generate-video'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -68,7 +69,7 @@ export default function GeneratingScreen() {
     const start = Date.now();
     while (Date.now() - start < 120_000) {
       await new Promise((r) => setTimeout(r, 3000));
-      const res = await fetch(`/api/generate-video?jobId=${jobId}`);
+      const res = await fetch(apiUrl(`/api/generate-video?jobId=${jobId}`));
       const data = await res.json();
       if (data.status === 'complete') return data.videoUrl;
       if (data.status === 'error') throw new Error('Video generation failed');
