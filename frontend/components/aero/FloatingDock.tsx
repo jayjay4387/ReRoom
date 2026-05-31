@@ -3,7 +3,8 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Home01Icon, Image01Icon } from '@hugeicons/core-free-icons';
+import Home01Icon from '@hugeicons/core-free-icons/Home01Icon';
+import Image01Icon from '@hugeicons/core-free-icons/Image01Icon';
 import { CTA_GREEN, GREEN_TEXT } from '../../constants/theme';
 
 const ICONS: Record<string, typeof Home01Icon> = { index: Home01Icon, gallery: Image01Icon };
