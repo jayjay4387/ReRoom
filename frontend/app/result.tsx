@@ -7,7 +7,7 @@ import StoryboardStrip from '../components/StoryboardStrip';
 
 export default function ResultScreen() {
   const router = useRouter();
-  const { photo, chaosFrame, finalFrame, videoUrl, description, reset } = useRoom();
+  const { photo, finalFrame, videoUrl, description, reset } = useRoom();
 
   const player = useVideoPlayer(videoUrl ?? '', (p) => {
     p.loop = true;
@@ -23,12 +23,15 @@ export default function ResultScreen() {
   return (
     <ScrollView className="flex-1 bg-black" contentContainerStyle={{ paddingBottom: 40 }}>
       <StoryboardStrip
-        frame1={photo?.uri ?? ''}
-        frame2={chaosFrame ?? ''}
-        frame3={finalFrame ?? ''}
+        frames={[photo?.uri, finalFrame].filter((u): u is string => !!u)}
       />
       {videoUrl && (
-        <VideoView player={player} className="w-full h-64 mt-4" contentFit="cover" />
+        <VideoView
+          player={player}
+          style={{ width: '100%', height: 360, marginTop: 16, backgroundColor: '#000' }}
+          contentFit="contain"
+          nativeControls
+        />
       )}
       {description && (
         <Text className="text-gray-300 text-sm px-6 mt-4 leading-relaxed">{description}</Text>
