@@ -11,14 +11,33 @@ export function chaosPrompt(answers: QuestionnaireAnswers): string {
   return ``;
 }
 
+// Concrete aesthetic direction per style id (answers.vibe). Falls back to the raw
+// vibe string for anything unrecognized.
+const STYLE_DIRECTION: Record<string, string> = {
+  minimal:
+    'Minimal — pared-back and calm: a neutral monochrome palette (white, soft grey, warm beige), clean uncluttered surfaces, generous negative space, simple unornamented forms, matte finishes.',
+  cozy:
+    'Cozy — warm and inviting: a soft warm palette (terracotta, cream, muted ochre), layered textiles (throws, cushions, rugs), natural wood and wool textures, soft diffused lamp light, a lived-in comforting feel.',
+  modern:
+    'Modern — sleek and intentional: a cool restrained palette with one bold accent, clean geometric lines, polished metal/glass/lacquer finishes, statement lighting, architectural precision.',
+  maximalist:
+    'Maximalist — rich and layered: a saturated jewel-tone palette, bold patterns, gallery-style wall arrangements, eclectic mixed materials, abundant texture and decor, full of personality.',
+};
+
+function styleDirection(vibe: string): string {
+  return STYLE_DIRECTION[vibe?.trim().toLowerCase()] ?? `${vibe || 'clean, intentional'} style.`;
+}
+
 export function finalDesignPrompt(answers: QuestionnaireAnswers): string {
-  return `Interior design photography of a fully reorganized room on a neutral seamless studio backdrop. Using the room dimensions, wall layout, windows, and doors from the reference image as the exact spatial blueprint — cleaned up and reorganized with intention.
+  return `Interior design photography of this room fully redesigned in the chosen style, on a neutral seamless studio backdrop. Using the room dimensions, wall layout, windows, and doors from the reference image as the exact spatial blueprint — reimagined with intention.
+
+STYLE DIRECTION — ${styleDirection(answers.vibe)} The redesign's palette, materials, finishes, lighting, and decor styling must clearly express this style.
 
 CRITICAL — NO ITEM REMOVAL: Every original item stays. Nothing is added or taken away. The only things that change are positioning, organization, and finish. The same furniture, the same decor, the same accessories — just exactly where they should be.
 
 SPATIAL CONSTRAINTS — STRICTLY RESPECTED: All windows remain in exact original positions — unblocked, unobscured, always visible. All doors remain in exact original positions with full clearance kept free. No furniture or objects placed in any door swing zone. All structural elements — ceiling height, floor area, wall lengths, alcoves — preserved exactly as in the reference image.
 
-THE ROOM: Walls repainted in a fresh clean version of their original tone — same color family, lighter and more deliberate, no marks or wear. All wall-mounted items straightened, reframed, or refined in place — nothing removed. Window treatments re-dressed in crisp freshly pressed versions of what exists — same style, same position, openings fully visible.
+THE ROOM: Walls repainted clean and deliberate in the palette of the chosen style, no marks or wear. All wall-mounted items straightened, reframed, or refined in place — nothing removed. Window treatments re-dressed in crisp freshly pressed versions of what exists — same style, same position, openings fully visible.
 
 Primary seating repositioned centered and squared to the main wall — cushions plumped and symmetrically arranged, any throws or pillows folded with intention. Secondary seating pulled to equal distances from the primary piece, angled precisely inward at matching angles. Primary surface centered exactly between the seating — cleared of clutter, only intentional objects remaining. Any floor coverings straightened and centered beneath the furniture grouping. Tall items and lighting repositioned to corners and perimeter walls, cords hidden.
 
@@ -33,7 +52,6 @@ Photorealistic, 3:4 aspect ratio, editorial interior photography. High detail, 2
 
 export function summaryPrompt(answers: QuestionnaireAnswers): string {
   // PUT YOUR GEMINI TEXT SUMMARY PROMPT HERE
-  
   return ``;
 }
 

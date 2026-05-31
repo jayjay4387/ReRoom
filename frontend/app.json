@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "ReRoom",
+    "slug": "reroom",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "reroom",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-video",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ReRoom needs access to your photos so you can redesign a room from a saved picture.",
+          "cameraPermission": "ReRoom needs camera access to photograph the room you want to redesign."
+        }
+      ]
+    ]
+  }
+}
