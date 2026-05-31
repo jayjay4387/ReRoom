@@ -1,14 +1,11 @@
 import { Request, Response } from 'express';
-
-const MOTION_PROMPT =
-  'Cinematic room transformation. Objects float and swirl through the air in slow motion, then gracefully settle into a beautiful new arrangement. Warm dramatic lighting, smooth camera drift, satisfying resolution.';
+import { videoMotionPrompt } from '../prompts';
 
 export async function submitVideo(req: Request, res: Response): Promise<void> {
   try {
-    const { frame1Base64, frame2Base64, frame3Base64 } = req.body as {
-      frame1Base64: string;
-      frame2Base64: string;
-      frame3Base64: string;
+    const { startFrameBase64, endFrameBase64 } = req.body as {
+      startFrameBase64: string;
+      endFrameBase64: string;
     };
 
     const apiKey = process.env.EACHLABS_API_KEY;
@@ -23,11 +20,10 @@ export async function submitVideo(req: Request, res: Response): Promise<void> {
         duration: 7,
         multi_shot: false,
         enhance: false,
-        prompt: MOTION_PROMPT,
+        prompt: videoMotionPrompt,
         keyframes: [
-          { image: frame1Base64 },
-          { image: frame2Base64 },
-          { image: frame3Base64 },
+          { image: startFrameBase64 },
+          { image: endFrameBase64 },
         ],
       }),
     });
