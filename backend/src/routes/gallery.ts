@@ -18,6 +18,7 @@ export async function getGallery(req: Request, res: Response): Promise<void> {
       .limit(limit)
       .toArray();
 
+    console.log(`[gallery] owner=${owner ?? '(community)'} -> ${redesigns.length} redesigns`);
     res.json({ redesigns });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'Unknown error';

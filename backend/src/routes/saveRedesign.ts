@@ -25,6 +25,7 @@ export async function saveRedesign(req: Request, res: Response): Promise<void> {
   }
 
   try {
+    console.log('[save-redesign] re-hosting video to Cloudinary...');
     const persistedVideoUrl = await uploadVideoFromUrl(videoUrl);
 
     const doc: Redesign = {
@@ -36,9 +37,11 @@ export async function saveRedesign(req: Request, res: Response): Promise<void> {
       createdAt: new Date().toISOString(),
     };
 
+    console.log('[save-redesign] inserting Mongo doc...');
     const db = await getDb();
     const { insertedId } = await db.collection<Redesign>('redesigns').insertOne(doc);
 
+    console.log(`[save-redesign] saved _id=${insertedId}`);
     res.json({ ...doc, _id: insertedId });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'Unknown error';

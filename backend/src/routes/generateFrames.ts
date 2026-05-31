@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { v2 as cloudinary } from 'cloudinary';
-import { chaosPrompt, finalDesignPrompt, QuestionnaireAnswers } from '../prompts';
+import { finalDesignPrompt, QuestionnaireAnswers } from '../prompts';
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -55,19 +55,21 @@ export async function generateFrames(req: Request, res: Response): Promise<void>
   }
 
   try {
-    const [chaosBase64s, finalBase64s] = await Promise.all([
-      generateCandidates(imageBase64, chaosPrompt(answers), 4),
-      generateCandidates(imageBase64, finalDesignPrompt(answers), 4),
+    // One Gemini call: the redesigned-room still shown next to the video. The video itself
+    // animates the original photo, so we no longer generate chaos frames or best-of-4 candidates.
+    console.log('[generate-frames] start — generating redesign with Gemini...');
+    const redesignBase64s = await generateCandidates(imageBase64, finalDesignPrompt(answers), 1);
+    const redesignBase64 = redesignBase64s[0];
+    if (!redesignBase64) throw new Error('Gemini returned no image');
+
+    console.log('[generate-frames] Gemini done — uploading original + redesign to Cloudinary...');
+    const [originalUrl, redesignUrl] = await Promise.all([
+      uploadToCloudinary(imageBase64),    // the real photo — animated by the video + saved
+      uploadToCloudinary(redesignBase64), // the redesigned-room still shown on the result screen
     ]);
 
-    const [originalUrl, chaosFrameCandidates, finalFrameCandidates] = await Promise.all([
-      uploadToCloudinary(imageBase64),
-      Promise.all(chaosBase64s.map(uploadToCloudinary)),
-      Promise.all(finalBase64s.map(uploadToCloudinary)),
-    ]);
-
-    // originalUrl is the hosted real photo — the video's start frame, and reused by save-redesign.
-    res.json({ originalUrl, chaosFrameCandidates, finalFrameCandidates, description: '' });
+    console.log('[generate-frames] done -> originalUrl + redesignUrl');
+    res.json({ originalUrl, redesignUrl, description: '' });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'Unknown error';
     console.error('[generate-frames] 500', message);

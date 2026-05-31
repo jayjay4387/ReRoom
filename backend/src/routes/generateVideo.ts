@@ -24,6 +24,7 @@ export async function generateVideo(req: Request, res: Response): Promise<void> 
 
   try {
     const auth = authHeader();
+    console.log('[generate-video] submitting to Higgsfield (Kling 3.0)...');
 
     const submitRes = await fetch(HF_ENDPOINT, {
       method: 'POST',
@@ -31,19 +32,26 @@ export async function generateVideo(req: Request, res: Response): Promise<void> 
       body: JSON.stringify({ image_url: imageUrl, prompt: videoMotionPrompt, duration: 7 }),
     });
     if (!submitRes.ok) throw new Error(`higgsfield submit ${submitRes.status}`);
-    const { status_url } = (await submitRes.json()) as SubmitResponse;
+    const { status_url, request_id } = (await submitRes.json()) as SubmitResponse;
     if (!status_url) throw new Error('higgsfield: no status_url returned');
+    console.log(`[generate-video] queued (request_id=${request_id}); polling — renders take ~1-3 min...`);
 
-    // Renders take ~1-3 min. Poll every 5s, cap at 5 min.
-    const deadline = Date.now() + 300_000;
+    const started = Date.now();
+    const deadline = started + 300_000;
     while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 5000));
       const stRes = await fetch(status_url, { headers: { Authorization: auth, Accept: 'application/json' } });
-      if (!stRes.ok) continue;
+      if (!stRes.ok) {
+        console.log(`[generate-video] status check HTTP ${stRes.status}, retrying...`);
+        continue;
+      }
       const data = (await stRes.json()) as StatusResponse;
+      const elapsed = Math.round((Date.now() - started) / 1000);
+      console.log(`[generate-video] ${elapsed}s — ${data.status}`);
       if (data.status === 'completed') {
         const videoUrl = data.video?.url;
         if (!videoUrl) throw new Error('higgsfield: completed but no video.url');
+        console.log(`[generate-video] done in ${elapsed}s -> ${videoUrl}`);
         res.json({ videoUrl });
         return;
       }
