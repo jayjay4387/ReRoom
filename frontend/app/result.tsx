@@ -24,8 +24,8 @@ export default function ResultScreen() {
     <ScrollView className="flex-1 bg-black" contentContainerStyle={{ paddingBottom: 40 }}>
       <StoryboardStrip
         frame1={photo?.uri ?? ''}
-        frame2={chaosFrame ? `data:image/jpeg;base64,${chaosFrame}` : ''}
-        frame3={finalFrame ? `data:image/jpeg;base64,${finalFrame}` : ''}
+        frame2={chaosFrame ?? ''}
+        frame3={finalFrame ?? ''}
       />
       {videoUrl && (
         <VideoView player={player} className="w-full h-64 mt-4" contentFit="cover" />

@@ -60,12 +60,14 @@ export async function generateFrames(req: Request, res: Response): Promise<void>
       generateCandidates(imageBase64, finalDesignPrompt(answers), 4),
     ]);
 
-    const [chaosFrameCandidates, finalFrameCandidates] = await Promise.all([
+    const [originalUrl, chaosFrameCandidates, finalFrameCandidates] = await Promise.all([
+      uploadToCloudinary(imageBase64),
       Promise.all(chaosBase64s.map(uploadToCloudinary)),
       Promise.all(finalBase64s.map(uploadToCloudinary)),
     ]);
 
-    res.json({ chaosFrameCandidates, finalFrameCandidates, description: '' });
+    // originalUrl is the hosted real photo — the video's start frame, and reused by save-redesign.
+    res.json({ originalUrl, chaosFrameCandidates, finalFrameCandidates, description: '' });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'Unknown error';
     console.error('[generate-frames] 500', message);

@@ -14,7 +14,7 @@ const STEPS = [
 
 export default function GeneratingScreen() {
   const router = useRouter();
-  const { photo, style, setChaosFrame, setFinalFrame, setVideoUrl, setDescription } = useRoom();
+  const { photo, style, setChaosFrame, setFinalFrame, setOriginalUrl, setVideoUrl, setDescription } = useRoom();
   const [step, setStep] = useState(0);
   const [chaosPreview, setChaosPreview] = useState<string | null>(null);
   const [finalPreview, setFinalPreview] = useState<string | null>(null);
@@ -30,29 +30,39 @@ export default function GeneratingScreen() {
       const framesRes = await fetch(apiUrl('/api/generate-frames'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: photo?.base64, style }),
+        body: JSON.stringify({
+          imageBase64: photo?.base64,
+          answers: { vibe: style, usage: '', color: '', material: '', transformationLevel: 'full' },
+        }),
       });
       if (!framesRes.ok) throw new Error(`generate-frames ${framesRes.status}`);
       const frames = await framesRes.json();
 
+      // Backend returns 4 candidates per frame (Cloudinary URLs) + the hosted original.
+      // Take the first candidate for now — no in-app chooser yet.
+      const originalUrl: string | undefined = frames.originalUrl;
+      const chaosUrl: string | undefined = frames.chaosFrameCandidates?.[0];
+      const finalUrl: string | undefined = frames.finalFrameCandidates?.[0];
+      if (!originalUrl || !finalUrl) throw new Error('generate-frames returned no usable frames');
+
       setStep(2);
-      setChaosPreview(frames.chaosFrame);
-      setChaosFrame(frames.chaosFrame);
+      if (chaosUrl) {
+        setChaosPreview(chaosUrl);
+        setChaosFrame(chaosUrl);
+      }
 
       setStep(3);
-      setFinalPreview(frames.finalFrame);
-      setFinalFrame(frames.finalFrame);
-      setDescription(frames.description);
+      setFinalPreview(finalUrl);
+      setFinalFrame(finalUrl);
+      setOriginalUrl(originalUrl);
+      setDescription(frames.description ?? '');
 
       setStep(4);
+      // Kling takes exactly 2 keyframes: start = original photo, end = final redesign.
       const videoRes = await fetch(apiUrl('/api/generate-video'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          frame1Base64: photo?.base64,
-          frame2Base64: frames.chaosFrame,
-          frame3Base64: frames.finalFrame,
-        }),
+        body: JSON.stringify({ startFrameUrl: originalUrl, endFrameUrl: finalUrl }),
       });
       if (!videoRes.ok) throw new Error(`generate-video ${videoRes.status}`);
       const { jobId } = await videoRes.json();
@@ -91,10 +101,10 @@ export default function GeneratingScreen() {
       <ProgressSteps steps={STEPS} current={step} />
       <View className="flex-row mt-10 gap-3">
         {chaosPreview && (
-          <Image source={{ uri: `data:image/jpeg;base64,${chaosPreview}` }} className="flex-1 h-32 rounded-xl" resizeMode="cover" />
+          <Image source={{ uri: chaosPreview }} className="flex-1 h-32 rounded-xl" resizeMode="cover" />
         )}
         {finalPreview && (
-          <Image source={{ uri: `data:image/jpeg;base64,${finalPreview}` }} className="flex-1 h-32 rounded-xl" resizeMode="cover" />
+          <Image source={{ uri: finalPreview }} className="flex-1 h-32 rounded-xl" resizeMode="cover" />
         )}
       </View>
     </View>
