@@ -1,68 +1,104 @@
 import { Request, Response } from 'express';
+import { v2 as cloudinary } from 'cloudinary';
 import { videoMotionPrompt } from '../prompts';
 
-// Higgsfield Kling 3.0 Pro, image-to-video. Single input image (the original room photo);
-// the motion prompt drives the cluttered -> organized transformation. Async: submit returns
-// a status_url to poll; the finished MP4 is at video.url on completion.
-const HF_ENDPOINT = 'https://platform.higgsfield.ai/kling-video/v3.0/pro/image-to-video';
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-function authHeader(): string {
-  const cred = process.env.HF_CREDENTIALS;
-  if (!cred) throw new Error('HF_CREDENTIALS not set (expected "KEY_ID:KEY_SECRET")');
-  return `Key ${cred}`;
+const EACHLABS_ENDPOINT = 'https://api.eachlabs.ai/v1/prediction/';
+
+async function uploadFrame(base64: string): Promise<{ url: string; publicId: string }> {
+  const result = await cloudinary.uploader.upload(`data:image/jpeg;base64,${base64}`, {
+    folder: 'reroom-frames',
+  });
+  return { url: result.secure_url, publicId: result.public_id };
 }
 
-type SubmitResponse = { status: string; request_id: string; status_url: string };
-type StatusResponse = { status: string; error?: string; video?: { url: string } };
+async function deleteFrame(publicId: string): Promise<void> {
+  await cloudinary.uploader.destroy(publicId).catch((e) =>
+    console.error('[generate-video] cloudinary cleanup failed:', e)
+  );
+}
+
+async function submitJob(startUrl: string, endUrl: string): Promise<string> {
+  const res = await fetch(EACHLABS_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'X-API-Key': process.env.EACHLABS_API_KEY!,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'kling-3.0',
+      parameters: {
+        prompt: videoMotionPrompt,
+        duration: 7,
+        mode: 'RESOLUTION_1080',
+        motion_has_audio: false,
+        enhance: false,
+        guidances: {
+          start_frame: [{ image: { url: startUrl, type: 'first_frame' } }],
+          end_frame:   [{ image: { url: endUrl,   type: 'end_frame'   } }],
+        },
+      },
+    }),
+  });
+  if (!res.ok) throw new Error(`Kling submit failed: ${res.status}`);
+  const data = await res.json() as { id: string };
+  if (!data.id) throw new Error('Kling: no prediction id returned');
+  return data.id;
+}
+
+async function pollJob(predictionId: string, attempts = 0): Promise<string> {
+  if (attempts > 40) throw new Error('Kling timed out after 120 seconds');
+  const res = await fetch(`${EACHLABS_ENDPOINT}${predictionId}`, {
+    headers: { 'X-API-Key': process.env.EACHLABS_API_KEY! },
+  });
+  if (!res.ok) throw new Error(`Kling poll failed: ${res.status}`);
+  const data = await res.json() as { status: string; output?: string; error?: string };
+  if (data.status === 'succeeded') {
+    if (!data.output) throw new Error('Kling succeeded but returned no output URL');
+    return data.output;
+  }
+  if (data.status === 'failed') throw new Error(`Kling generation failed: ${data.error ?? 'unknown'}`);
+  await new Promise((r) => setTimeout(r, 3000));
+  return pollJob(predictionId, attempts + 1);
+}
 
 export async function generateVideo(req: Request, res: Response): Promise<void> {
-  const { imageUrl } = req.body as { imageUrl?: string };
-  if (!imageUrl) {
-    res.status(400).json({ error: 'Missing required field: imageUrl' });
+  const { startFrameBase64, endFrameBase64 } = req.body as {
+    startFrameBase64?: string;
+    endFrameBase64?: string;
+  };
+
+  if (!startFrameBase64 || !endFrameBase64) {
+    res.status(400).json({ error: 'Missing required fields: startFrameBase64, endFrameBase64' });
     return;
   }
 
+  let startPublicId: string | null = null;
+  let endPublicId: string | null = null;
+
   try {
-    const auth = authHeader();
-    console.log('[generate-video] submitting to Higgsfield (Kling 3.0)...');
+    const [start, end] = await Promise.all([
+      uploadFrame(startFrameBase64),
+      uploadFrame(endFrameBase64),
+    ]);
+    startPublicId = start.publicId;
+    endPublicId = end.publicId;
 
-    const submitRes = await fetch(HF_ENDPOINT, {
-      method: 'POST',
-      headers: { Authorization: auth, 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ image_url: imageUrl, prompt: videoMotionPrompt, duration: 7 }),
-    });
-    if (!submitRes.ok) throw new Error(`higgsfield submit ${submitRes.status}`);
-    const { status_url, request_id } = (await submitRes.json()) as SubmitResponse;
-    if (!status_url) throw new Error('higgsfield: no status_url returned');
-    console.log(`[generate-video] queued (request_id=${request_id}); polling — renders take ~1-3 min...`);
+    const predictionId = await submitJob(start.url, end.url);
+    const videoUrl = await pollJob(predictionId);
 
-    const started = Date.now();
-    const deadline = started + 300_000;
-    while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 5000));
-      const stRes = await fetch(status_url, { headers: { Authorization: auth, Accept: 'application/json' } });
-      if (!stRes.ok) {
-        console.log(`[generate-video] status check HTTP ${stRes.status}, retrying...`);
-        continue;
-      }
-      const data = (await stRes.json()) as StatusResponse;
-      const elapsed = Math.round((Date.now() - started) / 1000);
-      console.log(`[generate-video] ${elapsed}s — ${data.status}`);
-      if (data.status === 'completed') {
-        const videoUrl = data.video?.url;
-        if (!videoUrl) throw new Error('higgsfield: completed but no video.url');
-        console.log(`[generate-video] done in ${elapsed}s -> ${videoUrl}`);
-        res.json({ videoUrl });
-        return;
-      }
-      if (data.status === 'failed') {
-        throw new Error(`higgsfield render failed: ${data.error ?? 'unknown'}`);
-      }
-    }
-    throw new Error('higgsfield render timed out after 5 minutes');
+    res.json({ videoUrl });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'Unknown error';
     console.error('[generate-video]', message);
     res.status(500).json({ error: message });
+  } finally {
+    if (startPublicId) await deleteFrame(startPublicId);
+    if (endPublicId) await deleteFrame(endPublicId);
   }
 }
