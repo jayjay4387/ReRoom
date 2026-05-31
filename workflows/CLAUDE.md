@@ -18,7 +18,7 @@ You are building **ReRoom**, a mobile app built with Expo (React Native) that le
 5. The redesign is uploaded to the cloud — **files (3 frames + video) → Cloudinary, metadata + URLs → MongoDB Atlas** — and appears in a **public community gallery** that every device sees. The user can also save the video to their camera roll.
 
 **Stack:**
-- Expo **SDK 54/55** with Expo Router (file-based routing)
+- Expo **SDK 54** with Expo Router (file-based routing) — pinned to 54 because that is the SDK the current Expo Go app supports; do not bump to a newer SDK without confirming Expo Go supports it
 - NativeWind v4 for styling — you write the exact same Tailwind classes (`className="flex-1 p-4 bg-slate-900"`); NativeWind compiles them to React Native style objects using the real `tailwindcss` engine + `tailwind.config.js`. (Vanilla Tailwind CSS targets the browser/DOM and cannot run in React Native — NativeWind is how Tailwind runs on RN. Most classes work; web-only features like `hover`/CSS grid have RN-specific behavior, but ReRoom's layouts don't need them.)
 - `expo-image-picker` for camera
 - `expo-video` for video playback

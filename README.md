@@ -47,7 +47,7 @@ RoomRevamp-RR-/
 
 | Layer    | Technology                            |
 |----------|---------------------------------------|
-| Mobile   | Expo SDK 51+, Expo Router, NativeWind |
+| Mobile   | Expo SDK 54, Expo Router, NativeWind |
 | Camera   | expo-image-picker                     |
 | Video    | expo-video, expo-sharing              |
 | Backend  | Node.js, Express, TypeScript          |

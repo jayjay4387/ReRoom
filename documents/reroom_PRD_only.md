@@ -24,7 +24,7 @@
    Cloudinary. The final video can also be saved to the phone's camera roll. See **Cloud Storage &
    Community Gallery** below.
 
-Also bumped: **Expo SDK 51 → 54/55**; `expo-video`, `expo-image-picker`, `expo-sharing`,
+Also bumped: **Expo SDK 51 → 54**; `expo-video`, `expo-image-picker`, `expo-sharing`,
 NativeWind v4 are all current.
 
 ---
@@ -58,7 +58,7 @@ NativeWind v4 are all current.
 
 | Layer | Tech |
 |---|---|
-| Framework | Expo (React Native, **SDK 54/55**) |
+| Framework | Expo (React Native, **SDK 54**) |
 | Routing | Expo Router (file-based, same concept as Next.js App Router) |
 | Styling | NativeWind v4 — Tailwind classes compiled to React Native styles; uses the real `tailwindcss` engine via `tailwind.config.js` (vanilla Tailwind CSS is web/DOM-only and can't run in RN) |
 | Camera | `expo-image-picker` for native camera viewfinder |
