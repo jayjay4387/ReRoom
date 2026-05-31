@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.4)',
   },
   tab: { flex: 1 },
-  pill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 9, borderRadius: 13 },
+  pill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, paddingHorizontal: 12, borderRadius: 13 },
   onText: { color: '#ffffff', fontWeight: '700', fontSize: 11 },
   offText: { color: GREEN_TEXT, fontWeight: '600', fontSize: 11 },
 });

@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
   },
   ghostWrap: { width: '86%', alignSelf: 'center', borderRadius: 999 },
   clip: { borderRadius: 999, overflow: 'hidden' },
-  fill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 13 },
+  fill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, paddingHorizontal: 24 },
   gloss: { position: 'absolute', top: 0, left: 0, right: 0, height: '50%' },
   primaryText: { color: '#ffffff', fontWeight: '700', fontSize: 15 },
   ghostBorder: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)' },
