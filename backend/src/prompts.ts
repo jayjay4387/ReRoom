@@ -70,4 +70,4 @@ Emotional arc: violent dispersal — mid-air reorganization — precise intentio
 STYLE: Photorealistic. Original architecture intact throughout. Only exact items from the start frame in motion — nothing extra. Light from camera-left, consistent. Camera locked-off — zero movement. 24fps minimum, no artifacts, no motion blur on frozen frames.
 DURATION: 7 seconds
 ASPECT RATIO: 3:4
-MODEL: Kling 3.0 via eachlabs.ai — start frame + end frame mode, no enhance`;
+MODEL: Higgsfield DoP image-to-video — start frame + end frame mode`;

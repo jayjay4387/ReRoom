@@ -34,7 +34,7 @@ scope. When the spec and the code disagree, **the code is the truth.** Known div
 before relying on either side):
 
 1. **Routing mechanism.** The spec describes Expo API Routes (`/app/api/*+api.ts`); the real backend
-   is a separate **Express** server in `backend/` (Gemini, eachlabs, Cloudinary, MongoDB). This is the
+   is a separate **Express** server in `backend/` (Gemini, Higgsfield, Cloudinary, MongoDB). This is the
    main remaining spec-vs-code gap — the cloud layer and frontend wiring below are now built.
 
 2. **Cloud layer + gallery — built.** MongoDB Atlas + **Cloudinary** (not GCS). Server:
@@ -72,15 +72,15 @@ minimal/cozy/modern/maximalist) → `generating` (calls the backend, polls, save
   `/api/generate-video` to get a `jobId`, then poll GET `/api/generate-video?jobId=…` every 3s with a
   120s timeout; on completion it fires `POST /api/save-redesign` (non-blocking) and navigates to
   `/result`. All calls go through `apiUrl()` (`lib/api.ts`).
-- **Backend endpoints** (`backend/src/index.ts` wires five handlers):
+- **Backend endpoints** (`backend/src/index.ts` wires four handlers):
   - `POST /api/generate-frames` → Gemini ×4 per frame (chaos + final), uploads candidates **and the
     original photo** to Cloudinary, returns `{ originalUrl, chaosFrameCandidates[], finalFrameCandidates[],
     description }`. No server-side best-of-4 — the client takes `[0]`.
-  - `POST /api/generate-video` (`submitVideo`) → submits `{ startFrameUrl, endFrameUrl }` + motion
-    prompt to `eachlabs.ai` (`kling-3.0`, 7s), returns `{ jobId }`.
-  - `GET /api/generate-video?jobId=…` (`pollVideo`) → maps eachlabs status to
-    `{ status: 'processing' | 'complete' | 'error', videoUrl? }`.
-  - `POST /api/save-redesign` → re-hosts the eachlabs video to Cloudinary, inserts the Mongo
+  - `POST /api/generate-video` (`generateVideo`) → calls **Higgsfield** (`@higgsfield/client`, DoP
+    `dop-turbo` model with a `start_end_frame` motion preset) on `{ startFrameUrl, endFrameUrl }`.
+    **Blocks** until the video renders (the SDK polls internally), then returns `{ videoUrl }`. No
+    separate poll endpoint.
+  - `POST /api/save-redesign` → re-hosts the Higgsfield video to Cloudinary, inserts the Mongo
     `redesigns` doc (tagged with `ownerId`); frames are already Cloudinary URLs.
   - `GET /api/gallery?owner=&limit=` → redesigns newest-first; `owner` → My Rooms, omit → community feed.
 - **The original photo travels as base64** (device → `generate-frames`, 20mb body limit); everything
@@ -92,13 +92,14 @@ minimal/cozy/modern/maximalist) → `generating` (calls the backend, polls, save
 - React Native primitives only: `<View>`/`<Text>`/`<Pressable>` (never `<div>`/`<p>`/`<button>`),
   all text wrapped in `<Text>`.
 - Styling via NativeWind `className="…"` Tailwind classes, not `StyleSheet`.
-- All third-party API calls (Gemini, eachlabs, Cloudinary, MongoDB) live **server-side in `backend/`**;
+- All third-party API calls (Gemini, Higgsfield, Cloudinary, MongoDB) live **server-side in `backend/`**;
   never call them from components, and never put API keys in client code.
 - Every async path needs explicit loading/error/success states.
 
 ## Secrets
 
-Required env vars live in `.env` (gitignored): `GEMINI_API_KEY`, `EACHLABS_API_KEY`,
+Required env vars live in `.env` (gitignored): `GEMINI_API_KEY`, `HF_CREDENTIALS`
+(`KEY_ID:KEY_SECRET` for Higgsfield, used by `generate-video`),
 `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` (used by `generate-frames`
 and `save-redesign`), and `MONGODB_URI` (used by `save-redesign` + `gallery`; optional `MONGODB_DB`
 defaults to `reroom`).

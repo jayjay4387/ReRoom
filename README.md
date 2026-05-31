@@ -31,13 +31,13 @@ RoomRevamp-RR-/
 │   │   ├── index.ts                 # Server entry point (port 3000)
 │   │   └── routes/
 │   │       ├── generateFrames.ts    # POST /api/generate-frames — Gemini (4 candidates each frame)
-│   │       └── generateVideo.ts     # POST/GET /api/generate-video — Kling 3.0, 7s
+│   │       └── generateVideo.ts     # POST /api/generate-video — Higgsfield (DoP), blocks until rendered
 │   ├── package.json
 │   └── tsconfig.json
 │
 ├── documents/                       # PRD and design docs
 ├── workflows/                       # CLAUDE.md workflow config
-├── .env                             # GEMINI_API_KEY, EACHLABS_API_KEY, MONGODB_URI, CLOUDINARY creds (never commit)
+├── .env                             # GEMINI_API_KEY, HF_CREDENTIALS, MONGODB_URI, CLOUDINARY creds (never commit)
 └── .gitignore
 ```
 
@@ -52,7 +52,7 @@ RoomRevamp-RR-/
 | Video    | expo-video, expo-sharing              |
 | Backend  | Node.js, Express, TypeScript          |
 | AI Image | Google Gemini (gemini-3.1-flash-image-preview) |
-| AI Video | Higgsfield via eachlabs.ai (Kling 3.0, 7s) |
+| AI Video | Higgsfield (DoP image-to-video, start/end frames) |
 | Storage  | Cloudinary — 3 frames + 7s video, CDN URLs |
 | Database | MongoDB Atlas — one doc per redesign (metadata + Cloudinary URLs) |
 | Gallery  | Public community feed + per-device "My Rooms" |
@@ -67,7 +67,7 @@ RoomRevamp-RR-/
 ```
 # .env
 GEMINI_API_KEY=your_key_here
-EACHLABS_API_KEY=your_key_here
+HF_CREDENTIALS=your_key_id:your_key_secret
 
 # cloud storage + gallery layer (MongoDB + Cloudinary)
 MONGODB_URI=your_atlas_uri_here

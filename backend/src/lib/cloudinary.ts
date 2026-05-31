@@ -12,7 +12,7 @@ export async function uploadImageBase64(base64: string, folder = 'reroom/frames'
   return result.secure_url;
 }
 
-// Re-host a remote video (e.g. the temporary eachlabs URL) on Cloudinary so it
+// Re-host a remote video (e.g. the temporary Higgsfield URL) on Cloudinary so it
 // outlives the generation job, and return the persistent CDN URL.
 export async function uploadVideoFromUrl(url: string, folder = 'reroom/videos'): Promise<string> {
   const result = await cloudinary.uploader.upload(url, { folder, resource_type: 'video' });

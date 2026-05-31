@@ -59,16 +59,15 @@ export default function GeneratingScreen() {
       setDescription(frames.description ?? '');
 
       setStep(4);
-      // Kling takes exactly 2 keyframes: start = original photo, end = final redesign.
+      // Higgsfield takes 2 frames: start = original photo, end = final redesign.
+      // This call blocks until the video is rendered (the backend polls Higgsfield).
       const videoRes = await fetch(apiUrl('/api/generate-video'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ startFrameUrl: originalUrl, endFrameUrl: finalUrl }),
       });
       if (!videoRes.ok) throw new Error(`generate-video ${videoRes.status}`);
-      const { jobId } = await videoRes.json();
-
-      const videoUrl = await pollVideo(jobId);
+      const { videoUrl } = await videoRes.json();
       setVideoUrl(videoUrl);
 
       // Persist to the gallery — non-blocking: the user still sees their result if this fails.
@@ -79,18 +78,6 @@ export default function GeneratingScreen() {
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Something went wrong');
     }
-  };
-
-  const pollVideo = async (jobId: string): Promise<string> => {
-    const start = Date.now();
-    while (Date.now() - start < 120_000) {
-      await new Promise((r) => setTimeout(r, 3000));
-      const res = await fetch(apiUrl(`/api/generate-video?jobId=${jobId}`));
-      const data = await res.json();
-      if (data.status === 'complete') return data.videoUrl;
-      if (data.status === 'error') throw new Error('Video generation failed');
-    }
-    throw new Error('Timed out after 120 seconds');
   };
 
   if (error) {

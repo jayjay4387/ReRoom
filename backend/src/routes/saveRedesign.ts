@@ -4,7 +4,7 @@ import { getDb, Redesign } from '../lib/mongo';
 
 // Persists a completed redesign so it shows up in the gallery (community feed + the
 // owner's "My Rooms"). The original/chaos/final frames are already Cloudinary URLs from
-// /api/generate-frames, so here we only re-host the temporary eachlabs video (so it
+// /api/generate-frames, so here we only re-host the temporary Higgsfield video (so it
 // doesn't expire) and write the Mongo doc.
 export async function saveRedesign(req: Request, res: Response): Promise<void> {
   const { ownerId, style, description, originalUrl, chaosUrl, finalUrl, videoUrl } = req.body as {

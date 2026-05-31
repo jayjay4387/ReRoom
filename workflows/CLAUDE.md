@@ -17,7 +17,7 @@ You are building **ReRoom**, a mobile app built with Expo (React Native) that le
 **What it does:**
 1. User takes a photo of their room
 2. Gemini (`gemini-3.1-flash-image-preview`, Nano Banana 2) generates two images: a chaos frame (mid-transformation) and a final redesigned room — **4 candidates each, best one selected** (2K, 16:9, neutral background)
-3. The **real photo (start frame)** and the **final redesign (end frame)** are sent to Kling 3.0 (via eachlabs.ai), which animates the transition into a 7-second cinematic video. The motion prompt creates the chaotic mid-transformation between the two frames.
+3. The **real photo (start frame)** and the **final redesign (end frame)** are sent to **Higgsfield** (DoP image-to-video with a start/end-frame motion preset), which animates the transition into a cinematic video. The motion prompt creates the chaotic mid-transformation between the two frames.
 4. User sees the storyboard (all 3 frames) and watches the video
 5. The redesign is uploaded to the cloud — **files (3 frames + video) → Cloudinary, metadata + URLs → MongoDB Atlas** — and appears in the gallery: a **public community feed** every device sees, plus a **"My Rooms"** view of this device's own history (matched by an anonymous device ID). The user can also save the video to their camera roll.
 
@@ -32,7 +32,7 @@ You are building **ReRoom**, a mobile app built with Expo (React Native) that le
 - **Cloudinary** for file storage — the 3 frames + the 7s video, uploaded **only** from API routes via the `cloudinary` Node SDK; returns CDN URLs stored in the Mongo document.
 - `@react-native-async-storage/async-storage` — stores the **anonymous device ID** (a UUID generated once via `expo-crypto`, reused as `ownerId` so the user can look back at their own redesigns) and, optionally, a lightweight cache of the current session result for instant replay. Not the source of truth for the gallery.
 - Google Gemini **`gemini-3.1-flash-image-preview`** (Nano Banana 2) for image generation — paid, no free tier; billing must be enabled. Generate **4 candidates per frame, pick best** (2K, 16:9, neutral background)
-- Video generation via eachlabs.ai — **Kling 3.0 model, 7 seconds, start frame + end frame, no multi-shot, no enhance**
+- Video generation via **Higgsfield** (`@higgsfield/client`) — **DoP image-to-video (`dop-turbo`), start frame + end frame via a `start_end_frame` motion preset**
 - API keys + DB/Cloudinary credentials live server-side only (in API Routes) — never in client components
 
 ---
@@ -53,7 +53,7 @@ You are building **ReRoom**, a mobile app built with Expo (React Native) that le
 - Handle both iOS and Android — don't assume one platform
 
 **API calls**
-- All Gemini, video (Kling/eachlabs), MongoDB, and Cloudinary calls go through Expo API Routes (`/app/api/`) — never call them directly from components
+- All Gemini, video (Higgsfield), MongoDB, and Cloudinary calls go through Expo API Routes (`/app/api/`) — never call them directly from components
 - The API routes are served by the running dev server (`npx expo start`); the device reaches them over the LAN. Keep the dev server up during the demo.
 - Always handle loading, error, and success states explicitly
 - Video generation is async — implement polling every 3 seconds with a max timeout of 120 seconds
@@ -79,7 +79,7 @@ reroom/
 │   ├── gallery.tsx        # Gallery: Community feed + "My Rooms" toggle, grid + replay
 │   └── api/
 │       ├── generate-frames+api.ts   # Gemini API route
-│       ├── generate-video+api.ts    # Kling 3.0 (eachlabs) API route
+│       ├── generate-video+api.ts    # Higgsfield (DoP) API route — blocks until rendered
 │       ├── save-redesign+api.ts     # Upload files to Cloudinary + insert Mongo doc (with ownerId)
 │       └── gallery+api.ts           # GET gallery from Mongo — community feed, or My Rooms via ?owner
 ├── components/
@@ -96,7 +96,7 @@ reroom/
 ├── constants/
 │   └── styles.ts             # Style options config (Minimal/Cozy/Modern/Maximalist)
 ├── hooks/
-│   ├── useVideoJob.ts        # Polling logic for the Kling/eachlabs video job status
+│   ├── useVideoJob.ts        # (optional) wrapper around the blocking Higgsfield video call
 │   └── useGallery.ts         # Fetches GET /api/gallery (community feed)
 └── .env
 ```
@@ -129,7 +129,7 @@ reroom/
   1. "Analyzing your room..."
   2. "Creating the chaos..." (4 candidates generated, best selected)
   3. "Designing your new space..." (4 candidates generated, best selected)
-  4. "Rendering your transformation..." (Kling 3.0, 7s)
+  4. "Rendering your transformation..." (Higgsfield DoP)
 - Each step activates as the corresponding API call completes
 - Show frame thumbnails as they arrive — don't wait for everything
 - On completion: call `POST /api/save-redesign` (passes the device `ownerId` + the frame URLs; re-hosts the video to Cloudinary, inserts the Mongo document), then navigate to `/result`. If the save call fails, still go to `/result` — persistence is non-blocking for the demo.
@@ -200,32 +200,28 @@ Frame 3 (final):
 **Request:**
 ```typescript
 {
-  startFrameBase64: string,  // Frame 1 — original room photo
-  endFrameBase64: string     // Frame 3 — final redesign (best of 4 candidates)
+  startFrameUrl: string,  // Frame 1 — original room photo (Cloudinary URL)
+  endFrameUrl: string     // Frame 3 — final redesign (Cloudinary URL)
 }
 ```
 
-> The chaos frame (Frame 2) is intentionally NOT sent. Kling 3.0 (and Higgsfield/Luma) only accept
-> 2 ordered keyframes; the chaos is created by the motion prompt between start and end.
+> The chaos frame (Frame 2) is intentionally NOT sent — only start + end. The transition between
+> them is produced by the motion preset + prompt.
 
 **What it does:**
-1. Submits the start + end frame to eachlabs.ai
-2. Model: **Kling 3.0** — do not use any other model
-3. Duration: **7 seconds**
-4. No multi-shot, no enhance — keep settings clean
-5. Returns a job ID
-6. Client polls `GET /api/generate-video?jobId=xxx` every 3 seconds
-7. Returns video URL when complete
+1. Calls **Higgsfield** via `@higgsfield/client` (DoP image-to-video, `dop-turbo`).
+2. Passes the start + end frame as `input_images` plus a `start_end_frame` motion preset (looked up
+   once via `getMotions()` and cached).
+3. **Blocks** until the video is rendered (the SDK polls Higgsfield internally) — there is no
+   separate poll endpoint.
+4. Returns the finished `{ videoUrl }`.
 
 **Motion prompt to pass to the video model:**
 > "Cinematic room transformation. Objects float and swirl through the air in slow motion, then gracefully settle into a beautiful new arrangement. Warm dramatic lighting, smooth camera drift, satisfying resolution."
 
-**Response (polling):**
+**Response:**
 ```typescript
-{
-  status: "processing" | "complete" | "error",
-  videoUrl?: string
-}
+{ videoUrl: string }
 ```
 
 ---
@@ -243,13 +239,13 @@ Persists a completed redesign to the cloud. Called once from `/generating` on co
   originalUrl: string,    // Frame 1 (real photo) — already a Cloudinary URL from generate-frames
   chaosUrl?: string,      // Frame 2 (chaos) — Cloudinary URL (optional)
   finalUrl: string,       // Frame 3 (final redesign) — Cloudinary URL
-  videoUrl: string        // the temporary eachlabs/Kling video URL from generate-video
+  videoUrl: string        // the temporary Higgsfield video URL from generate-video
 }
 ```
 
 **What it does (server-side only — holds Cloudinary + Mongo creds):**
 1. The frames are **already** Cloudinary URLs (uploaded by generate-frames), so they're stored as-is — no re-upload.
-2. Re-uploads the video to Cloudinary (remote-fetch from `videoUrl`) → 1 CDN video URL (so it outlives the temporary eachlabs URL)
+2. Re-uploads the video to Cloudinary (remote-fetch from `videoUrl`) → 1 CDN video URL (so it outlives the temporary Higgsfield URL)
 3. Inserts one document into MongoDB Atlas, stamped with `ownerId` (see schema below)
 4. Returns the saved document
 
@@ -305,7 +301,7 @@ shared **community feed** *and* a per-device **My Rooms** history. This is also 
   `/result` replay. Not the source of truth — the gallery always reads from Mongo.
 - **Camera roll** (separate from the feed): `expo-media-library`
   `MediaLibrary.saveToLibraryAsync(localVideoUri)` on the result screen, after a permission request.
-  (Download the Cloudinary/eachlabs video to a temp file first if needed.)
+  (Download the Cloudinary/Higgsfield video to a temp file first if needed.)
 
 ---
 
@@ -313,7 +309,7 @@ shared **community feed** *and* a per-device **My Rooms** history. This is also 
 
 ```
 GEMINI_API_KEY=
-EACHLABS_API_KEY=
+HF_CREDENTIALS=
 MONGODB_URI=
 CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
@@ -352,7 +348,7 @@ Access via `process.env.*` in API routes only. Never reference in any component 
 - Never read the `.env` file — not with Read, cat, or any shell command
 - Don't send the chaos frame to the video API — it is storyboard-only
 - Don't over-engineer — this ships in 24 hours
-- Don't use any video model other than Kling 3.0 (via eachlabs)
+- Use Higgsfield (DoP image-to-video) for video; the start→end transition uses a `start_end_frame` motion preset
 - Don't skip the 4-iteration frame selection — it directly affects video quality
 
 ---
@@ -372,8 +368,8 @@ A judge picks up a phone, opens the app, photographs the room they're standing i
    possible behavior changes. (The cheaper stable alternative is `gemini-2.5-flash-image` / Nano
    Banana 1, which has a ~500/day free tier and 1K output — keep it in mind as a fallback if the
    preview model's rate limits bite during team testing.)
-2. **Video pipeline:** Chosen model is **Kling 3.0 via eachlabs.ai (7-second clip)**. Verified that
-   Kling, Higgsfield, and Luma all cap at **2 ordered keyframes** (start + end). The original "pass
+2. **Video pipeline:** Initially **Kling 3.0 via eachlabs.ai** (later switched to **Higgsfield** — see
+   2026-05-31). Verified that Kling, Higgsfield, and Luma all cap at **2 ordered keyframes** (start + end). The original "pass
    all 3 frames as keyframes" approach is not supported by any mainstream provider. We now send
    **start = real photo, end = final redesign**, and let the **motion prompt** create the chaos
    between them. The chaos frame stays as a storyboard artifact. Frames are generated 4-candidates-
@@ -396,11 +392,18 @@ A judge picks up a phone, opens the app, photographs the room they're standing i
    using Cloudinary for the generated frames, so we standardized on it — `save-redesign` + `gallery`
    build on Cloudinary too. Same architecture either way (blobs in object storage, URLs + metadata in
    Mongo — the correct split, *not* GridFS); Cloudinary also gives CDN + transforms for free. Because
-   the chaos/final frames are already on Cloudinary from `generate-frames`, `save-redesign` only hosts
-   the original photo and re-hosts the eachlabs video, then inserts the Mongo doc.
+   the frames (including the original) are already on Cloudinary from `generate-frames`, `save-redesign`
+   only re-hosts the Higgsfield video, then inserts the Mongo doc.
 6. **Per-user history without auth: anonymous device ID.** Goal: users can look back at their own
    before/after + video sets. With auth explicitly out of scope, each device generates a UUID once
    (`expo-crypto` → `AsyncStorage`, `lib/identity.ts`) and sends it as `ownerId` on every save. The
    gallery now serves **both** the public community feed (`GET /api/gallery`) **and** "My Rooms"
    (`GET /api/gallery?owner=<id>`). Trade-off: history is per-device and resets on reinstall — fine for
    the hackathon; durable cross-device history is the one thing that would justify adding auth later.
+7. **Video provider: eachlabs → Higgsfield.** Switched to use an existing Higgsfield account. Higgsfield
+   has no plain "Kling start/end" API — instead it's the **DoP image-to-video** model (`@higgsfield/client`,
+   `dop-turbo`) with a **`start_end_frame` motion preset** (looked up via `getMotions()` and cached), passing
+   `input_images: [start, end]`. The SDK renders synchronously (`withPolling`), so the two-endpoint
+   submit+poll flow collapsed to a **single blocking `POST /api/generate-video`** returning `{ videoUrl }`;
+   `generating.tsx` no longer polls. Auth is a **Key ID + Secret pair** → `HF_CREDENTIALS="KEY_ID:KEY_SECRET"`
+   (replaces `EACHLABS_API_KEY`).
