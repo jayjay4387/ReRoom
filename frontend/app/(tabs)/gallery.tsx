@@ -145,11 +145,7 @@ function RedesignDetail({ redesign, onClose }: { redesign: Redesign; onClose: ()
   return (
     <View style={styles.detailRoot}>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        <StoryboardStrip
-          frame1={redesign.frameUrls[0]}
-          frame2={redesign.frameUrls[1]}
-          frame3={redesign.frameUrls[2]}
-        />
+        <StoryboardStrip frames={redesign.frameUrls.filter(Boolean)} />
         <VideoView player={player} style={styles.detailVideo} contentFit="cover" />
         {!!redesign.style && <Text style={styles.detailStyle}>{redesign.style}</Text>}
         {!!redesign.description && <Text style={styles.detailDesc}>{redesign.description}</Text>}

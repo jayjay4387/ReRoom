@@ -14,16 +14,14 @@ import { GLASS } from '../constants/theme';
 
 const STEPS = [
   'Analyzing your room...',
-  'Creating the chaos...',
   'Designing your new space...',
   'Rendering your transformation...',
 ];
 
 export default function GeneratingScreen() {
   const router = useRouter();
-  const { photo, style, setChaosFrame, setFinalFrame, setOriginalUrl, setVideoUrl, setDescription } = useRoom();
+  const { photo, style, setFinalFrame, setOriginalUrl, setVideoUrl, setDescription } = useRoom();
   const [step, setStep] = useState(0);
-  const [chaosPreview, setChaosPreview] = useState<string | null>(null);
   const [finalPreview, setFinalPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,26 +41,18 @@ export default function GeneratingScreen() {
       if (!framesRes.ok) throw new Error(`generate-frames ${framesRes.status}`);
       const frames = await framesRes.json();
 
-      // Backend returns 4 candidates per frame (Cloudinary URLs) + the hosted original.
-      // Take the first candidate for now — no in-app chooser yet.
+      // Backend returns the hosted original photo + one redesigned-room still (Cloudinary URLs).
       const originalUrl: string | undefined = frames.originalUrl;
-      const chaosUrl: string | undefined = frames.chaosFrameCandidates?.[0];
-      const finalUrl: string | undefined = frames.finalFrameCandidates?.[0];
-      if (!originalUrl || !finalUrl) throw new Error('generate-frames returned no usable frames');
+      const redesignUrl: string | undefined = frames.redesignUrl;
+      if (!originalUrl || !redesignUrl) throw new Error('generate-frames returned no usable frames');
 
       setStep(2);
-      if (chaosUrl) {
-        setChaosPreview(chaosUrl);
-        setChaosFrame(chaosUrl);
-      }
-
-      setStep(3);
-      setFinalPreview(finalUrl);
-      setFinalFrame(finalUrl);
+      setFinalPreview(redesignUrl);
+      setFinalFrame(redesignUrl);
       setOriginalUrl(originalUrl);
       setDescription(frames.description ?? '');
 
-      setStep(4);
+      setStep(3);
       // Higgsfield Kling 3.0 animates the original room (cluttered -> organized) from one image.
       // This call blocks until the video is rendered (the backend polls Higgsfield).
       const videoRes = await fetch(apiUrl('/api/generate-video'), {
@@ -75,7 +65,7 @@ export default function GeneratingScreen() {
       setVideoUrl(videoUrl);
 
       // Persist to the gallery — non-blocking: the user still sees their result if this fails.
-      saveRedesign({ originalUrl, chaosUrl, finalUrl, videoUrl, style, description: frames.description ?? '' })
+      saveRedesign({ originalUrl, finalUrl: redesignUrl, videoUrl, style, description: frames.description ?? '' })
         .catch((err) => console.warn('[save-redesign] failed (non-blocking):', err));
 
       router.push('/result');
@@ -118,27 +108,10 @@ export default function GeneratingScreen() {
           </BlurView>
         </View>
 
-        {/* Frame thumbnails — fade in as each arrives (Cloudinary URLs) */}
-        {(chaosPreview || finalPreview) && (
-          <View style={styles.thumbRow}>
-            {chaosPreview && (
-              <View style={styles.thumbFrame}>
-                <Image
-                  source={{ uri: chaosPreview }}
-                  style={styles.thumb}
-                  resizeMode="cover"
-                />
-              </View>
-            )}
-            {finalPreview && (
-              <View style={styles.thumbFrame}>
-                <Image
-                  source={{ uri: finalPreview }}
-                  style={styles.thumb}
-                  resizeMode="cover"
-                />
-              </View>
-            )}
+        {/* Redesign still — fades in when ready (Cloudinary URL); show the FULL image */}
+        {finalPreview && (
+          <View style={styles.previewBox}>
+            <Image source={{ uri: finalPreview }} style={styles.previewImg} resizeMode="contain" />
           </View>
         )}
       </View>
@@ -190,26 +163,22 @@ const styles = StyleSheet.create({
     marginVertical: 14,
   },
 
-  // frame thumbnails
-  thumbRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
+  // redesign preview — full image, not cropped
+  previewBox: {
     width: '100%',
-  },
-  thumbFrame: {
-    flex: 1,
-    height: 100,
-    borderRadius: 14,
+    height: 300,
+    marginTop: 16,
+    borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.75)',
+    backgroundColor: 'rgba(255,255,255,0.18)',
     shadowColor: '#143C5A',
     shadowOpacity: 0.15,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
   },
-  thumb: { width: '100%', height: '100%' },
+  previewImg: { width: '100%', height: '100%' },
 
   // error card
   errorShadow: {
