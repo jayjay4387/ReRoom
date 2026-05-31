@@ -148,7 +148,8 @@ both a shared community feed and a per-device "My Rooms" history. This is also t
 - **My Rooms.** `GET /api/gallery?owner=<ownerId>` returns just this device's redesigns
   (`find({ ownerId }).sort({ createdAt: -1 })`) — the personal "look back" history.
 - **Persistence flow.** On generation-complete the client calls `POST /api/save-redesign` with its
-  `ownerId` (uploads files to Cloudinary, inserts the Mongo document). Non-blocking: if it fails, the user
+  `ownerId` (frames are already on Cloudinary from generate-frames, so it just re-hosts the video and
+  inserts the Mongo document). Non-blocking: if it fails, the user
   still sees their result.
 - **Camera roll.** On the result screen the user can also **save the video to the phone's camera
   roll** via `expo-media-library` (asks permission once).

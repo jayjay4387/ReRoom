@@ -132,7 +132,7 @@ reroom/
   4. "Rendering your transformation..." (Kling 3.0, 7s)
 - Each step activates as the corresponding API call completes
 - Show frame thumbnails as they arrive — don't wait for everything
-- On completion: call `POST /api/save-redesign` (passes the device `ownerId`; uploads the 3 frames + video to Cloudinary, inserts the Mongo document), then navigate to `/result`. If the save call fails, still go to `/result` — persistence is non-blocking for the demo.
+- On completion: call `POST /api/save-redesign` (passes the device `ownerId` + the frame URLs; re-hosts the video to Cloudinary, inserts the Mongo document), then navigate to `/result`. If the save call fails, still go to `/result` — persistence is non-blocking for the demo.
 
 ### `result.tsx` — Result Screen
 - StoryboardStrip at top showing all 3 frames with arrows between them
@@ -237,18 +237,18 @@ Persists a completed redesign to the cloud. Called once from `/generating` on co
 **Request:**
 ```typescript
 {
-  ownerId: string,          // anonymous device UUID (from lib/identity.ts)
-  style: "minimal" | "cozy" | "modern" | "maximalist",
+  ownerId: string,        // anonymous device UUID (from lib/identity.ts)
+  style: string,          // the chosen style (sent as answers.vibe upstream)
   description: string,
-  originalBase64: string,   // Frame 1 (real photo)
-  chaosBase64: string,      // Frame 2 (chaos)
-  finalBase64: string,      // Frame 3 (final redesign)
-  videoUrl: string          // the eachlabs/Kling video URL from generate-video
+  originalUrl: string,    // Frame 1 (real photo) — already a Cloudinary URL from generate-frames
+  chaosUrl?: string,      // Frame 2 (chaos) — Cloudinary URL (optional)
+  finalUrl: string,       // Frame 3 (final redesign) — Cloudinary URL
+  videoUrl: string        // the temporary eachlabs/Kling video URL from generate-video
 }
 ```
 
 **What it does (server-side only — holds Cloudinary + Mongo creds):**
-1. Uploads the 3 frames (base64) to Cloudinary → 3 CDN image URLs
+1. The frames are **already** Cloudinary URLs (uploaded by generate-frames), so they're stored as-is — no re-upload.
 2. Re-uploads the video to Cloudinary (remote-fetch from `videoUrl`) → 1 CDN video URL (so it outlives the temporary eachlabs URL)
 3. Inserts one document into MongoDB Atlas, stamped with `ownerId` (see schema below)
 4. Returns the saved document
