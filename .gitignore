@@ -14,6 +14,9 @@ frontend/dist/
 frontend/web-build/
 frontend/expo-env.d.ts
 
+# Superpowers brainstorm companion
+.superpowers/
+
 # OS
 .DS_Store
 Thumbs.db
