@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
   body: { flex: 1, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 36 },
 
   // empty state — two big action cards centered
-  empty: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 20 },
+  empty: { flex: 1, justifyContent: 'flex-start', alignItems: 'center', gap: 20, paddingTop: 16 },
   prompt: {
     fontSize: 13,
     fontWeight: '600',
