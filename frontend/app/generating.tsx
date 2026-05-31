@@ -43,29 +43,29 @@ export default function GeneratingScreen() {
 
       // Backend returns the hosted original photo + one redesigned-room still (Cloudinary URLs).
       const originalUrl: string | undefined = frames.originalUrl;
-      const redesignUrl: string | undefined = frames.redesignUrl;
-      if (!originalUrl || !redesignUrl) throw new Error('generate-frames returned no usable frames');
+      const finalUrl: string | undefined = frames.redesignUrl;
+      if (!originalUrl || !finalUrl) throw new Error('generate-frames returned no usable frames');
 
       setStep(2);
-      setFinalPreview(redesignUrl);
-      setFinalFrame(redesignUrl);
+      setFinalPreview(finalUrl);
+      setFinalFrame(finalUrl);
       setOriginalUrl(originalUrl);
       setDescription(frames.description ?? '');
 
       setStep(3);
-      // Higgsfield Kling 3.0 animates the original room (cluttered -> organized) from one image.
+      // Kling 3.0: original photo as start frame, Gemini redesign as end frame.
       // This call blocks until the video is rendered (the backend polls Higgsfield).
       const videoRes = await fetch(apiUrl('/api/generate-video'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl: originalUrl }),
+        body: JSON.stringify({ startFrameUrl: originalUrl, endFrameUrl: finalUrl }),
       });
       if (!videoRes.ok) throw new Error(`generate-video ${videoRes.status}`);
       const { videoUrl } = await videoRes.json();
       setVideoUrl(videoUrl);
 
       // Persist to the gallery — non-blocking: the user still sees their result if this fails.
-      saveRedesign({ originalUrl, finalUrl: redesignUrl, videoUrl, style, description: frames.description ?? '' })
+      saveRedesign({ originalUrl, finalUrl, videoUrl, style, description: frames.description ?? '' })
         .catch((err) => console.warn('[save-redesign] failed (non-blocking):', err));
 
       router.push('/result');
