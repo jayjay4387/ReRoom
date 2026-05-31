@@ -35,8 +35,8 @@ app.listen(PORT, () => {
   }, null, 2));
   console.log('\nExpected response:');
   console.log(JSON.stringify({
-    chaosFrameCandidates: ['<base64>', '<base64>', '<base64>', '<base64>'],
-    finalFrameCandidates: ['<base64>', '<base64>', '<base64>', '<base64>'],
+    chaosFrameCandidates: ['https://res.cloudinary.com/...', '...', '...', '...'],
+    finalFrameCandidates: ['https://res.cloudinary.com/...', '...', '...', '...'],
     description: '',
   }, null, 2));
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
