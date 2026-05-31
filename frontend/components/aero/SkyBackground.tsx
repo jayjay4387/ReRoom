@@ -1,10 +1,72 @@
 import { ReactNode } from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Defs, RadialGradient, Stop, Ellipse } from 'react-native-svg';
-import { SKY_GRADIENT, GRASS_GRADIENT, IRIDESCENT, SKY_FALLBACK } from '../../constants/theme';
+import Svg, {
+  Defs,
+  RadialGradient,
+  Stop,
+  Ellipse,
+  Path,
+  LinearGradient as SvgLG,
+} from 'react-native-svg';
+import { SKY_GRADIENT, IRIDESCENT, SKY_FALLBACK } from '../../constants/theme';
 
 const { width } = Dimensions.get('window');
+
+// Local meadow shades (kept here so theme.ts is untouched).
+const HILL_BACK_TOP = '#9FE06A';
+const HILL_BACK_BOTTOM = '#6FBE3F';
+const HILL_FRONT_TOP = '#7CCD44';
+const HILL_FRONT_BOTTOM = '#2E7D24';
+const BLADE_GREEN = '#B6EE7A';
+const HILLTOP_HIGHLIGHT = 'rgba(220,255,180,0.7)';
+
+const GRASS_H = 120;
+
+// Back hill: a gentle wide swell sitting a touch higher than the front hill.
+const BACK_HILL = `M0 ${GRASS_H} L0 52 ` +
+  `C ${width * 0.28} 22, ${width * 0.52} 70, ${width * 0.72} 44 ` +
+  `S ${width} 36, ${width} 50 ` +
+  `L ${width} ${GRASS_H} Z`;
+
+// Front hill: lower/forward crest for depth, baseline of the grass blades.
+const FRONT_CREST_Y = 78;
+const FRONT_HILL = `M0 ${GRASS_H} L0 ${FRONT_CREST_Y} ` +
+  `C ${width * 0.22} ${FRONT_CREST_Y - 22}, ${width * 0.4} ${FRONT_CREST_Y + 10}, ${width * 0.6} ${FRONT_CREST_Y - 6} ` +
+  `S ${width * 0.9} ${FRONT_CREST_Y - 18}, ${width} ${FRONT_CREST_Y - 4} ` +
+  `L ${width} ${GRASS_H} Z`;
+
+// A point along the smooth front crest (cubic-ish approximation) so blades sit on it.
+function frontCrestY(x: number): number {
+  const t = x / width;
+  // Smooth-ish undulation matching the curve above, plus tiny jitter for life.
+  const wave = Math.sin(t * Math.PI * 1.6) * 9 + Math.sin(t * Math.PI * 4.3) * 3;
+  return FRONT_CREST_Y - 6 - wave;
+}
+
+// Build a single Path of triangular grass tufts across the front hilltop.
+const BLADE_COUNT = 30;
+function buildBlades(): string {
+  let d = '';
+  const step = width / BLADE_COUNT;
+  for (let i = 0; i <= BLADE_COUNT; i++) {
+    const baseX = i * step;
+    const baseY = frontCrestY(baseX);
+    const lean = (i % 3) - 1; // -1, 0, 1 alternating lean
+    const halfW = step * 0.34;
+    const h = 9 + (i % 4) * 3; // 9..18 px tall blades
+    const tipX = baseX + lean * 2.5;
+    // Triangle: left base -> tip -> right base
+    d += `M ${baseX - halfW} ${baseY} L ${tipX} ${baseY - h} L ${baseX + halfW} ${baseY} Z `;
+  }
+  return d.trim();
+}
+const BLADES = buildBlades();
+
+// Thin sunlit highlight tracing the front crest.
+const FRONT_HIGHLIGHT = `M0 ${FRONT_CREST_Y} ` +
+  `C ${width * 0.22} ${FRONT_CREST_Y - 22}, ${width * 0.4} ${FRONT_CREST_Y + 10}, ${width * 0.6} ${FRONT_CREST_Y - 6} ` +
+  `S ${width * 0.9} ${FRONT_CREST_Y - 18}, ${width} ${FRONT_CREST_Y - 4}`;
 
 export default function SkyBackground({ children }: { children: ReactNode }) {
   return (
@@ -36,9 +98,40 @@ export default function SkyBackground({ children }: { children: ReactNode }) {
         pointerEvents="none"
       />
 
-      <View style={styles.hillClip} pointerEvents="none">
-        <LinearGradient colors={GRASS_GRADIENT} style={styles.hill} />
-      </View>
+      <Svg
+        style={styles.meadow}
+        width={width}
+        height={GRASS_H}
+        pointerEvents="none"
+      >
+        <Defs>
+          <SvgLG id="hillBack" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={HILL_BACK_TOP} />
+            <Stop offset="1" stopColor={HILL_BACK_BOTTOM} />
+          </SvgLG>
+          <SvgLG id="hillFront" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={HILL_FRONT_TOP} />
+            <Stop offset="1" stopColor={HILL_FRONT_BOTTOM} />
+          </SvgLG>
+        </Defs>
+
+        {/* Distant rolling hill (lighter, slightly higher) */}
+        <Path d={BACK_HILL} fill="url(#hillBack)" />
+
+        {/* Foreground hill (darker, lower/forward for depth) */}
+        <Path d={FRONT_HILL} fill="url(#hillFront)" />
+
+        {/* Sunlit highlight along the front crest */}
+        <Path
+          d={FRONT_HIGHLIGHT}
+          stroke={HILLTOP_HIGHLIGHT}
+          strokeWidth={2}
+          fill="none"
+        />
+
+        {/* Grass blades / tufts so the silhouette reads as grass */}
+        <Path d={BLADES} fill={BLADE_GREEN} opacity={0.95} />
+      </Svg>
 
       <View style={styles.content}>{children}</View>
     </View>
@@ -49,14 +142,5 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: SKY_FALLBACK },
   content: { flex: 1 },
   sweep: { opacity: 0.5 },
-  hillClip: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 70, overflow: 'hidden' },
-  hill: {
-    position: 'absolute',
-    bottom: 0,
-    left: -width * 0.16,
-    right: -width * 0.16,
-    height: 150,
-    borderTopLeftRadius: width,
-    borderTopRightRadius: width,
-  },
+  meadow: { position: 'absolute', left: 0, right: 0, bottom: 0 },
 });
