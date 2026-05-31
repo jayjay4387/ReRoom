@@ -1,27 +1,7 @@
 import { Request, Response } from 'express';
-import { v2 as cloudinary } from 'cloudinary';
 import { videoMotionPrompt } from '../prompts';
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
 const EACHLABS_ENDPOINT = 'https://api.eachlabs.ai/v1/prediction/';
-
-async function uploadFrame(base64: string): Promise<{ url: string; publicId: string }> {
-  const result = await cloudinary.uploader.upload(`data:image/jpeg;base64,${base64}`, {
-    folder: 'reroom-frames',
-  });
-  return { url: result.secure_url, publicId: result.public_id };
-}
-
-async function deleteFrame(publicId: string): Promise<void> {
-  await cloudinary.uploader.destroy(publicId).catch((e) =>
-    console.error('[generate-video] cloudinary cleanup failed:', e)
-  );
-}
 
 async function submitJob(startUrl: string, endUrl: string): Promise<string> {
   const res = await fetch(EACHLABS_ENDPOINT, {
@@ -68,37 +48,23 @@ async function pollJob(predictionId: string, attempts = 0): Promise<string> {
 }
 
 export async function generateVideo(req: Request, res: Response): Promise<void> {
-  const { startFrameBase64, endFrameBase64 } = req.body as {
-    startFrameBase64?: string;
-    endFrameBase64?: string;
+  const { startFrameUrl, endFrameUrl } = req.body as {
+    startFrameUrl?: string;
+    endFrameUrl?: string;
   };
 
-  if (!startFrameBase64 || !endFrameBase64) {
-    res.status(400).json({ error: 'Missing required fields: startFrameBase64, endFrameBase64' });
+  if (!startFrameUrl || !endFrameUrl) {
+    res.status(400).json({ error: 'Missing required fields: startFrameUrl, endFrameUrl' });
     return;
   }
 
-  let startPublicId: string | null = null;
-  let endPublicId: string | null = null;
-
   try {
-    const [start, end] = await Promise.all([
-      uploadFrame(startFrameBase64),
-      uploadFrame(endFrameBase64),
-    ]);
-    startPublicId = start.publicId;
-    endPublicId = end.publicId;
-
-    const predictionId = await submitJob(start.url, end.url);
+    const predictionId = await submitJob(startFrameUrl, endFrameUrl);
     const videoUrl = await pollJob(predictionId);
-
     res.json({ videoUrl });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'Unknown error';
     console.error('[generate-video]', message);
     res.status(500).json({ error: message });
-  } finally {
-    if (startPublicId) await deleteFrame(startPublicId);
-    if (endPublicId) await deleteFrame(endPublicId);
   }
 }
