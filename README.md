@@ -31,7 +31,7 @@ RoomRevamp-RR-/
 │   │   ├── index.ts                 # Server entry point (port 3000)
 │   │   └── routes/
 │   │       ├── generateFrames.ts    # POST /api/generate-frames — Gemini (4 candidates each frame)
-│   │       └── generateVideo.ts     # POST /api/generate-video — Higgsfield (DoP), blocks until rendered
+│   │       └── generateVideo.ts     # POST /api/generate-video — Higgsfield Kling 3.0 (single image), blocks until rendered
 │   ├── package.json
 │   └── tsconfig.json
 │
@@ -52,7 +52,7 @@ RoomRevamp-RR-/
 | Video    | expo-video, expo-sharing              |
 | Backend  | Node.js, Express, TypeScript          |
 | AI Image | Google Gemini (gemini-3.1-flash-image-preview) |
-| AI Video | Higgsfield (DoP image-to-video, start/end frames) |
+| AI Video | Higgsfield Kling 3.0 Pro (image-to-video, single frame, 7s) |
 | Storage  | Cloudinary — 3 frames + 7s video, CDN URLs |
 | Database | MongoDB Atlas — one doc per redesign (metadata + Cloudinary URLs) |
 | Gallery  | Public community feed + per-device "My Rooms" |

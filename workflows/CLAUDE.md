@@ -17,7 +17,7 @@ You are building **ReRoom**, a mobile app built with Expo (React Native) that le
 **What it does:**
 1. User takes a photo of their room
 2. Gemini (`gemini-3.1-flash-image-preview`, Nano Banana 2) generates two images: a chaos frame (mid-transformation) and a final redesigned room — **4 candidates each, best one selected** (2K, 16:9, neutral background)
-3. The **real photo (start frame)** and the **final redesign (end frame)** are sent to **Higgsfield** (DoP image-to-video with a start/end-frame motion preset), which animates the transition into a cinematic video. The motion prompt creates the chaotic mid-transformation between the two frames.
+3. The **original room photo** is sent to **Higgsfield Kling 3.0 Pro** (image-to-video, single frame). The motion prompt animates that one image from cluttered → organized into a cinematic transformation video. (The Gemini redesign is shown in the storyboard but is not the video's end frame — Higgsfield's API takes a single image.)
 4. User sees the storyboard (all 3 frames) and watches the video
 5. The redesign is uploaded to the cloud — **files (3 frames + video) → Cloudinary, metadata + URLs → MongoDB Atlas** — and appears in the gallery: a **public community feed** every device sees, plus a **"My Rooms"** view of this device's own history (matched by an anonymous device ID). The user can also save the video to their camera roll.
 
@@ -32,7 +32,7 @@ You are building **ReRoom**, a mobile app built with Expo (React Native) that le
 - **Cloudinary** for file storage — the 3 frames + the 7s video, uploaded **only** from API routes via the `cloudinary` Node SDK; returns CDN URLs stored in the Mongo document.
 - `@react-native-async-storage/async-storage` — stores the **anonymous device ID** (a UUID generated once via `expo-crypto`, reused as `ownerId` so the user can look back at their own redesigns) and, optionally, a lightweight cache of the current session result for instant replay. Not the source of truth for the gallery.
 - Google Gemini **`gemini-3.1-flash-image-preview`** (Nano Banana 2) for image generation — paid, no free tier; billing must be enabled. Generate **4 candidates per frame, pick best** (2K, 16:9, neutral background)
-- Video generation via **Higgsfield** (`@higgsfield/client`) — **DoP image-to-video (`dop-turbo`), start frame + end frame via a `start_end_frame` motion preset**
+- Video generation via **Higgsfield Kling 3.0 Pro** REST (`platform.higgsfield.ai/kling-video/v3.0/pro/image-to-video`) — **single input image (the original room), prompt-driven cluttered→organized, `duration: 7`, async submit + poll**
 - API keys + DB/Cloudinary credentials live server-side only (in API Routes) — never in client components
 
 ---
@@ -79,7 +79,7 @@ reroom/
 │   ├── gallery.tsx        # Gallery: Community feed + "My Rooms" toggle, grid + replay
 │   └── api/
 │       ├── generate-frames+api.ts   # Gemini API route
-│       ├── generate-video+api.ts    # Higgsfield (DoP) API route — blocks until rendered
+│       ├── generate-video+api.ts    # Higgsfield Kling 3.0 (single image) API route — blocks until rendered
 │       ├── save-redesign+api.ts     # Upload files to Cloudinary + insert Mongo doc (with ownerId)
 │       └── gallery+api.ts           # GET gallery from Mongo — community feed, or My Rooms via ?owner
 ├── components/
@@ -129,7 +129,7 @@ reroom/
   1. "Analyzing your room..."
   2. "Creating the chaos..." (4 candidates generated, best selected)
   3. "Designing your new space..." (4 candidates generated, best selected)
-  4. "Rendering your transformation..." (Higgsfield DoP)
+  4. "Rendering your transformation..." (Higgsfield Kling 3.0)
 - Each step activates as the corresponding API call completes
 - Show frame thumbnails as they arrive — don't wait for everything
 - On completion: call `POST /api/save-redesign` (passes the device `ownerId` + the frame URLs; re-hosts the video to Cloudinary, inserts the Mongo document), then navigate to `/result`. If the save call fails, still go to `/result` — persistence is non-blocking for the demo.
@@ -200,24 +200,23 @@ Frame 3 (final):
 **Request:**
 ```typescript
 {
-  startFrameUrl: string,  // Frame 1 — original room photo (Cloudinary URL)
-  endFrameUrl: string     // Frame 3 — final redesign (Cloudinary URL)
+  imageUrl: string  // the original room photo (Cloudinary URL) — the single input frame
 }
 ```
 
-> The chaos frame (Frame 2) is intentionally NOT sent — only start + end. The transition between
-> them is produced by the motion preset + prompt.
+> Single-image only. Higgsfield's public API takes one image; the cluttered→organized transformation
+> is driven entirely by the motion prompt. The Gemini redesign (Frame 3) is storyboard-only — it is
+> NOT the video's end frame.
 
 **What it does:**
-1. Calls **Higgsfield** via `@higgsfield/client` (DoP image-to-video, `dop-turbo`).
-2. Passes the start + end frame as `input_images` plus a `start_end_frame` motion preset (looked up
-   once via `getMotions()` and cached).
-3. **Blocks** until the video is rendered (the SDK polls Higgsfield internally) — there is no
-   separate poll endpoint.
-4. Returns the finished `{ videoUrl }`.
+1. Calls **Higgsfield Kling 3.0 Pro** REST: `POST platform.higgsfield.ai/kling-video/v3.0/pro/image-to-video`
+   (header `Authorization: Key <KEY_ID>:<KEY_SECRET>`), body `{ image_url, prompt, duration: 7 }`.
+2. The submit returns `{ status, request_id, status_url }` (async).
+3. **Blocks**: polls `status_url` every ~5s until `completed` (or `failed`); renders take ~1-3 min.
+4. Returns the finished `{ videoUrl }` (from `video.url` on the completed status response).
 
-**Motion prompt to pass to the video model:**
-> "Cinematic room transformation. Objects float and swirl through the air in slow motion, then gracefully settle into a beautiful new arrangement. Warm dramatic lighting, smooth camera drift, satisfying resolution."
+**Motion prompt to pass to the video model:** the single-image cluttered→organized transformation
+prompt in `backend/src/prompts.ts` (`videoMotionPrompt`).
 
 **Response:**
 ```typescript
@@ -348,7 +347,7 @@ Access via `process.env.*` in API routes only. Never reference in any component 
 - Never read the `.env` file — not with Read, cat, or any shell command
 - Don't send the chaos frame to the video API — it is storyboard-only
 - Don't over-engineer — this ships in 24 hours
-- Use Higgsfield (DoP image-to-video) for video; the start→end transition uses a `start_end_frame` motion preset
+- Use Higgsfield Kling 3.0 Pro (single-image image-to-video) for video; the cluttered→organized transformation lives in the motion prompt
 - Don't skip the 4-iteration frame selection — it directly affects video quality
 
 ---
@@ -400,10 +399,13 @@ A judge picks up a phone, opens the app, photographs the room they're standing i
    gallery now serves **both** the public community feed (`GET /api/gallery`) **and** "My Rooms"
    (`GET /api/gallery?owner=<id>`). Trade-off: history is per-device and resets on reinstall — fine for
    the hackathon; durable cross-device history is the one thing that would justify adding auth later.
-7. **Video provider: eachlabs → Higgsfield.** Switched to use an existing Higgsfield account. Higgsfield
-   has no plain "Kling start/end" API — instead it's the **DoP image-to-video** model (`@higgsfield/client`,
-   `dop-turbo`) with a **`start_end_frame` motion preset** (looked up via `getMotions()` and cached), passing
-   `input_images: [start, end]`. The SDK renders synchronously (`withPolling`), so the two-endpoint
-   submit+poll flow collapsed to a **single blocking `POST /api/generate-video`** returning `{ videoUrl }`;
-   `generating.tsx` no longer polls. Auth is a **Key ID + Secret pair** → `HF_CREDENTIALS="KEY_ID:KEY_SECRET"`
-   (replaces `EACHLABS_API_KEY`).
+7. **Video provider: eachlabs → Higgsfield Kling 3.0 (single image).** Switched to use an existing
+   Higgsfield account. We tested Higgsfield's start/end-frame options and confirmed its **public API
+   only accepts one input image** (`image_url`); the end-frame field isn't documented and the endpoint
+   silently ignores unknown fields, so a true start→end interpolation isn't reachable via the API.
+   Final approach: **Kling 3.0 Pro REST** (`platform.higgsfield.ai/kling-video/v3.0/pro/image-to-video`,
+   auth `Key ID:SECRET`) with the **original room photo** as the single `image_url` + a cluttered→organized
+   motion prompt + `duration: 7`. Async submit → poll `status_url` → `video.url`; the backend blocks and
+   returns `{ videoUrl }` from a **single `POST /api/generate-video`** (`generating.tsx` doesn't poll).
+   The Gemini redesign stays storyboard-only. Auth env: `HF_CREDENTIALS="KEY_ID:KEY_SECRET"` (replaced
+   `EACHLABS_API_KEY`). The `@higgsfield/client` SDK was dropped — we call the REST API with `fetch`.

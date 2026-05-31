@@ -48,8 +48,9 @@ before relying on either side):
    string that ignores `answers` — so the questionnaire doesn't yet shape output, and `description`
    comes back empty.
 
-4. **Video keyframes — matches.** `generateVideo.ts` takes `{ startFrameUrl, endFrameUrl }` (2
-   keyframes: original photo + final redesign); the chaos frame is storyboard-only, not sent.
+4. **Video — single image (Kling 3.0).** `generateVideo.ts` takes `{ imageUrl }` (the original room
+   photo) and calls Higgsfield **Kling 3.0 Pro**; the prompt drives a cluttered→organized transformation.
+   It is NOT a start/end interpolation — the Gemini redesign is storyboard-only, not the video's end frame.
 
 5. **Frontend wiring — resolved.** Full Expo scaffolding is committed; the app uses the `(tabs)` layout
    with a floating dock. `lib/api.ts` resolves an absolute backend URL (`EXPO_PUBLIC_API_URL` → Expo
@@ -76,10 +77,10 @@ minimal/cozy/modern/maximalist) → `generating` (calls the backend, polls, save
   - `POST /api/generate-frames` → Gemini ×4 per frame (chaos + final), uploads candidates **and the
     original photo** to Cloudinary, returns `{ originalUrl, chaosFrameCandidates[], finalFrameCandidates[],
     description }`. No server-side best-of-4 — the client takes `[0]`.
-  - `POST /api/generate-video` (`generateVideo`) → calls **Higgsfield** (`@higgsfield/client`, DoP
-    `dop-turbo` model with a `start_end_frame` motion preset) on `{ startFrameUrl, endFrameUrl }`.
-    **Blocks** until the video renders (the SDK polls internally), then returns `{ videoUrl }`. No
-    separate poll endpoint.
+  - `POST /api/generate-video` (`generateVideo`) → calls **Higgsfield Kling 3.0 Pro** REST
+    (`platform.higgsfield.ai/kling-video/v3.0/pro/image-to-video`, auth `Key ID:SECRET`) with the
+    **original room photo** as `image_url` + a transformation prompt + `duration: 7`. **Blocks**:
+    submits, polls the returned `status_url` until `completed`, returns `{ videoUrl }` (from `video.url`).
   - `POST /api/save-redesign` → re-hosts the Higgsfield video to Cloudinary, inserts the Mongo
     `redesigns` doc (tagged with `ownerId`); frames are already Cloudinary URLs.
   - `GET /api/gallery?owner=&limit=` → redesigns newest-first; `owner` → My Rooms, omit → community feed.

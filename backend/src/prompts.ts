@@ -56,18 +56,11 @@ export function summaryPrompt(answers: QuestionnaireAnswers): string {
   return ``;
 }
 
-// Static — no answers needed. Start frame = original photo, end frame = Gemini reorganized room.
-// Chaos image is described as mid-scatter reference in the motion prompt only — not sent as a keyframe.
-export const videoMotionPrompt = `START FRAME: Original room as photographed — all furniture, decor, and accessories fully present, grounded, still. Original walls, floor, ceiling, doors, and windows exactly as photographed. Soft diffused light from camera-left.
-END FRAME: Same room, exact same items, reorganized with intention. Nothing added, nothing removed. Primary seating floated from wall and centered on main axis. Secondary seating flanking at equal distances, angled inward. Primary surface centered in the grouping. Floor coverings anchored beneath furniture, centered and straight. Tall items and plants pushed to corners. Storage flush to walls with breathing room. Every surface cleared to intentional objects only. Same walls, same floor, same light.
-TRANSITION:
-0:00–0:05 Room holds still. Every object grounded and quiet. Walls, floor, ceiling, doors, and windows static and unchanged for the entire video.
-0:05–0:50 Every item visible in the start frame simultaneously launches outward in a violent explosive burst from the room's center — only and exactly those items, nothing else. Seating tilts and rises, surfaces spin, floor coverings unroll mid-air, smaller objects scatter, tall items arc sideways, plants tip and trail soil particles. Architecture does not move.
-0:50–1:20 Peak scatter — every item suspended at maximum distance. Room empty below, only original architecture visible. No new items, nothing that was not in the original room.
-1:20–5:30 Every item descends slowly into its new optimized position. Largest seating first, secondary seating follows symmetrically, floor coverings unfurl flat, primary surface centers precisely, tall items settle into corners, smaller decor lands last. Each arrival final and precise — one graceful descent, no adjustment.
-5:30–7:00 Room locks into place. Dust settles. Last object lands. Stillness.
-Emotional arc: violent dispersal — mid-air reorganization — precise intentional rebirth.
-STYLE: Photorealistic. Original architecture intact throughout. Only exact items from the start frame in motion — nothing extra. Light from camera-left, consistent. Camera locked-off — zero movement. 24fps minimum, no artifacts, no motion blur on frozen frames.
-DURATION: 7 seconds
-ASPECT RATIO: 3:4
-MODEL: Higgsfield DoP image-to-video — start frame + end frame mode`;
+// Single-image motion prompt: the model animates ONE image (the original room photo)
+// transforming from cluttered → reorganized. No start/end frame — the whole transformation
+// lives in the prompt (Higgsfield's API only takes one input image).
+export const videoMotionPrompt = `The room in this image reorganizes itself into a clean, intentional, beautifully arranged version of itself — the same room with the same furniture and decor, nothing added or removed, only repositioned and tidied.
+
+MOTION: Every object in the room simultaneously lifts and launches outward in a dramatic mid-air burst from the room's center — seating tilts and rises, surfaces spin, rugs unroll mid-air, smaller objects scatter, tall items arc sideways, plants tip and trail particles. At peak scatter the items hang suspended, leaving only the bare room. Then everything descends slowly and precisely into an optimized arrangement: large seating settles centered and squared to the wall, secondary seating flanks it symmetrically, rugs lie flat and centered, every surface clears to only a few intentional objects, storage sits flush against the walls with breathing room, all clutter gone. The room locks into place, dust settles, stillness.
+
+The architecture — walls, floor, ceiling, windows, doors — stays fixed and unchanged throughout; only the room's contents move. Photorealistic, consistent soft lighting, locked-off camera with no camera movement, smooth and satisfying, no artifacts.`;

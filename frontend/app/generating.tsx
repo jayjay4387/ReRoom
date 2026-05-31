@@ -59,12 +59,12 @@ export default function GeneratingScreen() {
       setDescription(frames.description ?? '');
 
       setStep(4);
-      // Higgsfield takes 2 frames: start = original photo, end = final redesign.
+      // Higgsfield Kling 3.0 animates the original room (cluttered -> organized) from one image.
       // This call blocks until the video is rendered (the backend polls Higgsfield).
       const videoRes = await fetch(apiUrl('/api/generate-video'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startFrameUrl: originalUrl, endFrameUrl: finalUrl }),
+        body: JSON.stringify({ imageUrl: originalUrl }),
       });
       if (!videoRes.ok) throw new Error(`generate-video ${videoRes.status}`);
       const { videoUrl } = await videoRes.json();

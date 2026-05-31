@@ -13,7 +13,7 @@
 
 1. **Gemini image model.** We use **Nano Banana 2 (`gemini-3.1-flash-image-preview`)** for image
    generation. **No free tier — billing required day one.** Preview model; have a paid key ready.
-2. **Video pipeline is start-frame + end-frame only.** Higgsfield (DoP, start/end-frame motion preset) caps at 2
+2. **Video pipeline is single-image (Higgsfield Kling 3.0 Pro).** Higgsfield's public API takes one image; we feed the **original room photo** and let the prompt drive a cluttered→organized transformation. (A true start→end interpolation isn't reachable via the API.) Caps at
    keyframes. **Frame 1 (real photo) = start, Frame 3 (final redesign) = end.** The motion prompt
    creates the chaotic mid-transformation between them. The chaos frame (Frame 2) is still generated
    by Gemini and shown in the storyboard strip — it is just not a video keyframe.
@@ -39,7 +39,7 @@ NativeWind v4 are all current.
 
 **Name:** ReRoom
 **Tagline:** *Point. Redesign. Watch it happen.*
-**Core idea:** User scans their room → Gemini generates a chaos frame and a final redesign frame → the real photo and the final redesign are sent to Higgsfield (DoP image-to-video) as start/end frames → cinematic transition video of the room transforming. Every redesign is saved to the cloud and shown in the gallery — a public community feed plus the user's own "My Rooms" history.
+**Core idea:** User scans their room → Gemini generates a chaos frame and a final redesign frame → the original room photo is sent to Higgsfield Kling 3.0 Pro (single-image image-to-video) → cinematic video of the room transforming from cluttered to organized. Every redesign is saved to the cloud and shown in the gallery — a public community feed plus the user's own "My Rooms" history.
 
 ---
 
@@ -54,7 +54,7 @@ NativeWind v4 are all current.
    - Frame 1: User's real photo (current room)
    - Frame 2: AI-generated chaos/transition state (storyboard only)
    - Frame 3: AI-generated final redesign
-5. **Transition video** — **Frame 1 (start) + Frame 3 (end)** + a motion prompt are sent to Higgsfield (DoP image-to-video, start/end-frame motion preset). It animates from the real room to the final redesign; the motion prompt creates the chaotic mid-transformation between the two frames.
+5. **Transition video** — the **original room photo** + a motion prompt are sent to Higgsfield Kling 3.0 Pro (single-image image-to-video, 7s). It animates that one image from cluttered → organized; the motion prompt drives the transformation. (The Gemini redesign is shown in the storyboard but isn't the video's end frame.)
 6. **Result screen** — Shows the 3 frames as a storyboard strip and the full generated video below it. Save-to-camera-roll + share buttons. The redesign is automatically uploaded to Cloudinary + MongoDB (tagged with the device's `ownerId`) and posted to the gallery.
 7. **Gallery** — A public community feed (from MongoDB) of everyone's redesigns, plus a **"My Rooms"** view filtered to this device's own `ownerId`; tap any one to replay its storyboard + video.
 
@@ -69,7 +69,7 @@ NativeWind v4 are all current.
 | Styling | NativeWind v4 — Tailwind classes compiled to React Native styles; uses the real `tailwindcss` engine via `tailwind.config.js` (vanilla Tailwind CSS is web/DOM-only and can't run in RN) |
 | Camera | `expo-image-picker` for native camera viewfinder |
 | Room analysis + image generation | Google Gemini **`gemini-3.1-flash-image-preview`** (Nano Banana 2 — native image output, paid/no free tier) |
-| Transition video | **Higgsfield** (`@higgsfield/client`) — DoP image-to-video (`dop-turbo`), start frame + end frame via a `start_end_frame` motion preset |
+| Transition video | **Higgsfield Kling 3.0 Pro** — REST image-to-video, single input frame (original room), `duration: 7`, async submit + poll |
 | API layer | Expo API Routes to keep API keys + DB/Cloudinary creds off the client (served by the running dev server) |
 | File storage | **Cloudinary** — the 3 frames + 7s video; returns CDN URLs |
 | Database / gallery | **MongoDB Atlas** — one document per redesign (ownerId, style, description, Cloudinary URLs, createdAt); powers the community feed + per-device "My Rooms" |
@@ -113,15 +113,15 @@ NativeWind v4 are all current.
 - Output: Best of 4 generated images of the fully redesigned room (Frame 3)
 
 ### Frame Quality Note
-The video is only as good as the start and end frames. Invest generation time here — do not skip the 4-iteration selection step. A weak Frame 3 means a weak video regardless of how good the video model (Higgsfield DoP) is.
+The Gemini frames still matter for the storyboard, and the **original room photo** matters for the video (it's the single frame the video animates). Don't skip the 4-iteration selection on the Gemini frames — but note the video itself is driven by the original photo + the motion prompt, not the redesign frame.
 
-### 3. Video API — Higgsfield (DoP image-to-video)
-- Provider/SDK: **Higgsfield** via `@higgsfield/client`; model **`dop-turbo`** (DoP image-to-video)
-- **Mode: start + end frame**, driven by a **`start_end_frame` motion preset** (found via `getMotions()` and cached)
-- Input: **Frame 1 (real photo) as the start frame, Frame 3 (final redesign) as the end frame**, passed as `input_images: [start, end]`. The chaos frame (Frame 2) is **not** sent — only start + end. (Kling, Higgsfield, and Luma all cap at 2 ordered keyframes.)
-- Motion prompt: *"Cinematic room transformation. The space dissolves and rebuilds itself — furniture morphs, materials shift, colors bleed into new ones — in a slow, dramatic sweep. Warm golden lighting pulses through the room as it transforms. Smooth camera drift, dust particles floating in the light, satisfying reveal at the end."* — produces the chaotic mid-transition between the two frames; tune aggressively if too static.
-- Output: MP4 transition video (real room → chaotic motion → final redesign)
-- Note: the SDK renders **synchronously** (`withPolling`), so the backend call **blocks** until the video is ready and returns `{ videoUrl }` — no separate poll endpoint. Show a loading state on the client while it waits.
+### 3. Video API — Higgsfield Kling 3.0 Pro (image-to-video)
+- Endpoint: `POST https://platform.higgsfield.ai/kling-video/v3.0/pro/image-to-video`, header `Authorization: Key <KEY_ID>:<KEY_SECRET>`
+- **Mode: single input image.** Higgsfield's public API takes one image; a true start→end interpolation isn't reachable via the API (the end-frame field is undocumented and the endpoint silently ignores unknown fields).
+- Input: **the original room photo** as `image_url` + the motion prompt + `duration: 7`. The Gemini redesign (Frame 3) is **storyboard-only** — not the video's end frame.
+- Motion prompt: the cluttered→organized transformation in `backend/src/prompts.ts` (`videoMotionPrompt`) — the room's objects scatter into the air, then settle into a clean, intentional arrangement.
+- Output: MP4 transformation video (the room tidying itself), at `video.url` on completion.
+- Note: **async** — submit returns `{ status, request_id, status_url }`; poll `status_url` (~5s) until `completed`. The backend **blocks** through the poll and returns `{ videoUrl }`. Renders take ~1-3 min; show a loading state.
 
 ---
 
@@ -213,7 +213,7 @@ both a shared community feed and a per-device "My Rooms" history. This is also t
 | 1 | Camera screen + image picker + `/scan` flow |
 | 2 | Home, style picker, result screen, **community gallery screen** UI |
 | 3 (technical) | Gemini API integration (Frame 2 + Frame 3 generation, 4-iteration selection) |
-| 4 (technical) | Video API (Higgsfield DoP) + video playback + **MongoDB + Cloudinary layer** (`save-redesign`, `gallery` routes, device-ID `ownerId` plumbing) |
+| 4 (technical) | Video API (Higgsfield Kling 3.0) + video playback + **MongoDB + Cloudinary layer** (`save-redesign`, `gallery` routes, device-ID `ownerId` plumbing) |
 | Tech lead | Floating — owns shared scaffolds (RoomContext, MongoDB/Cloudinary modules, device-ID identity, API route contracts), unblocks everyone, owns the riskiest path (video generation) |
 
 ---
