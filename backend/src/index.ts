@@ -1,12 +1,10 @@
+import './env'; // must be first — loads .env before cloudinary.config() in the routes runs
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { generateFrames } from './routes/generateFrames';
 import { generateVideo } from './routes/generateVideo';
 import { saveRedesign } from './routes/saveRedesign';
 import { getGallery } from './routes/gallery';
-
-dotenv.config({ path: '../.env' });
 
 const app = express();
 app.use(cors());
