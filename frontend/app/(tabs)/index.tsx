@@ -1,14 +1,12 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, Image, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
-import { HugeiconsIcon } from '@hugeicons/react-native';
 import Camera01Icon from '@hugeicons/core-free-icons/Camera01Icon';
 import SkyBackground from '../../components/aero/SkyBackground';
-import GlassCard from '../../components/aero/GlassCard';
 import GlassHouse from '../../components/aero/GlassHouse';
 import { GlassButtonPrimary } from '../../components/aero/GlassButton';
-import { WORDMARK_GRADIENT, GLASS } from '../../constants/theme';
+import { WORDMARK_GRADIENT } from '../../constants/theme';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -22,11 +20,13 @@ export default function HomeScreen() {
           </LinearGradient>
         </MaskedView>
         <Text style={styles.tag}>Point. Redesign. Watch it happen.</Text>
-        <GlassCard style={styles.card}>
-          <HugeiconsIcon icon={Camera01Icon} size={26} color={GLASS.textDark} />
-          <Text style={styles.lead}>Scan a room to begin</Text>
-        </GlassCard>
-        <View style={styles.spacer} />
+        <View style={styles.coverFrame}>
+          <Image
+            source={require('../../assets/images/cover-image-reroom.png')}
+            style={styles.cover}
+            resizeMode="cover"
+          />
+        </View>
         <GlassButtonPrimary label="Scan Your Room" icon={Camera01Icon} onPress={() => router.push('/scan')} />
       </View>
     </SkyBackground>
@@ -38,7 +38,15 @@ const styles = StyleSheet.create({
   brand: { fontSize: 40, fontWeight: '800', letterSpacing: 0.5, textAlign: 'center', color: '#000000' },
   brandHidden: { opacity: 0 },
   tag: { marginTop: 4, fontSize: 13, textAlign: 'center', color: '#EEF8FF' },
-  card: { width: '100%', marginTop: 24 },
-  lead: { fontSize: 12, color: GLASS.textDark, opacity: 0.85 },
-  spacer: { flex: 1 },
+  coverFrame: {
+    flex: 1,
+    width: '100%',
+    marginTop: 20,
+    marginBottom: 24,
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.82)',
+  },
+  cover: { width: '100%', height: '100%' },
 });
