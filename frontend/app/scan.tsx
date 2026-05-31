@@ -40,7 +40,7 @@ function ActionCard({
             <HugeiconsIcon icon={icon} size={30} color={GLASS.textDark} />
           </View>
         )}
-        <Text style={styles.actionLabel}>{label}</Text>
+        <Text style={styles.actionLabel} numberOfLines={1}>{label}</Text>
       </BlurView>
     </Pressable>
   );
@@ -96,7 +96,7 @@ export default function ScanScreen() {
             <Text style={styles.prompt}>Point at the room you want to redesign</Text>
             <View style={styles.cardsRow}>
               <ActionCard icon={Camera01Icon} label="Take Photo" accent onPress={() => pickFrom('camera')} />
-              <ActionCard icon={Image01Icon} label="Choose from gallery" onPress={() => pickFrom('library')} />
+              <ActionCard icon={Image01Icon} label="Gallery" onPress={() => pickFrom('library')} />
             </View>
           </View>
         )}
@@ -134,6 +134,8 @@ const styles = StyleSheet.create({
   cardsRow: { flexDirection: 'row', gap: 14, width: '100%' },
   cardWrap: {
     flex: 1,
+    flexBasis: 0,
+    minWidth: 0,
     borderRadius: 20,
     shadowColor: '#143C5A',
     shadowOpacity: 0.2,
