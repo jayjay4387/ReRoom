@@ -53,15 +53,28 @@ export default function GeneratingScreen() {
       setDescription(frames.description ?? '');
 
       setStep(3);
-      // Kling 3.0: original photo as start frame, Gemini redesign as end frame.
-      // This call blocks until the video is rendered (the backend polls Higgsfield).
-      const videoRes = await fetch(apiUrl('/api/generate-video'), {
+      // Submit to Higgsfield — returns immediately with a jobId (status_url)
+      const submitRes = await fetch(apiUrl('/api/generate-video'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startFrameUrl: originalUrl, endFrameUrl: finalUrl }),
+        body: JSON.stringify({ imageUrl: originalUrl }),
       });
-      if (!videoRes.ok) throw new Error(`generate-video ${videoRes.status}`);
-      const { videoUrl } = await videoRes.json();
+      if (!submitRes.ok) throw new Error(`generate-video submit ${submitRes.status}`);
+      const { jobId } = await submitRes.json();
+      if (!jobId) throw new Error('generate-video: no jobId returned');
+
+      // Poll until completed (Kling 3.0 Pro takes ~3-5 min), cap at 10 min
+      const deadline = Date.now() + 600_000;
+      let videoUrl: string | null = null;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 5000));
+        const pollRes = await fetch(apiUrl(`/api/generate-video?jobId=${encodeURIComponent(jobId)}`));
+        if (!pollRes.ok) continue;
+        const data = await pollRes.json();
+        if (data.status === 'completed' && data.videoUrl) { videoUrl = data.videoUrl; break; }
+        if (data.status === 'failed') throw new Error(`Video render failed: ${data.error ?? 'unknown'}`);
+      }
+      if (!videoUrl) throw new Error('Video generation timed out');
       setVideoUrl(videoUrl);
 
       // Persist to the gallery — non-blocking: the user still sees their result if this fails.
