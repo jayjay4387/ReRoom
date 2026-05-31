@@ -1,8 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { generateFrames } from './routes/generateFrames.js';
-import { generateVideo } from './routes/generateVideo.js';
+import { generateFrames } from './routes/generateFrames';
+import { generateVideo } from './routes/generateVideo';
 
 dotenv.config({ path: '../../.env' });
 
