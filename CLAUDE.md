@@ -32,11 +32,13 @@ description of the committed code.** Large parts of it are unimplemented. `READM
 `documents/` describe intended scope. When the spec and the code disagree, **the code is the truth.**
 Known divergences (likely real bugs / unfinished work — confirm before relying on either side):
 
-1. **Architecture.** The spec describes Expo API Routes (`/app/api/*+api.ts`), MongoDB Atlas,
-   **Google Cloud Storage (GCS)**, and a gallery with a public community feed + per-device "My Rooms"
-   (`gallery.tsx`, `lib/mongo.ts`, `lib/gcs.ts`, `lib/identity.ts`, `save-redesign`, etc.). **None of
-   this exists.** The real backend is a separate Express server in `backend/`. There is no DB, no cloud
-   storage, no device-ID identity, and no gallery in the committed code.
+1. **Architecture.** The spec describes Expo API Routes (`/app/api/*+api.ts`). The real backend is a
+   separate **Express** server in `backend/`. The cloud layer (MongoDB Atlas + **Cloudinary**, not
+   GCS) now exists **server-side**: `backend/src/routes/saveRedesign.ts` + `gallery.ts`,
+   `backend/src/lib/cloudinary.ts` + `lib/mongo.ts`, plus a frontend `frontend/lib/identity.ts`
+   (anonymous device-ID `ownerId`). What's **not** wired yet: the frontend doesn't call any of it —
+   `app/(tabs)/gallery.tsx` is a "coming soon" stub, nothing calls `POST /api/save-redesign`, and
+   `RoomContext` doesn't hold an `ownerId`.
 
 2. **Gemini model.** Code (`backend/src/routes/generateFrames.ts`) calls `gemini-2.0-flash-exp`.
    The spec/README say `gemini-3.1-flash-image-preview`. They don't match.
@@ -96,9 +98,10 @@ minimal/cozy/modern/maximalist) → `generating` (calls the two backend endpoint
 
 ## Secrets
 
-Required env vars live in `.env` (gitignored): `GEMINI_API_KEY`, `EACHLABS_API_KEY`. (The spec also
-lists `MONGODB_URI`, `GCS_BUCKET`, and `GOOGLE_APPLICATION_CREDENTIALS` for the planned MongoDB + GCS
-cloud-storage layer, but those are unused by the current code.)
+Required env vars live in `.env` (gitignored): `GEMINI_API_KEY`, `EACHLABS_API_KEY`,
+`CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` (used by `generate-frames`
+and `save-redesign`), and `MONGODB_URI` (used by `save-redesign` + `gallery`; optional `MONGODB_DB`
+defaults to `reroom`).
 
 **Never read `.env`** — do not Read, `cat`, or otherwise print its contents. API keys must never
 appear in conversation context.

@@ -3,9 +3,9 @@
 > **Revision (2026-05-30):** Updated after a tech-stack audit. Three corrections + one scope
 > addition vs. the original draft. See **Key Technical Decisions** below for the *why*.
 >
-> **Revision (2026-05-31):** Storage provider is now **Google Cloud Storage (GCS)** (was Cloudinary),
-> and the gallery gained a per-device **"My Rooms"** history alongside the public community feed —
-> keyed by an **anonymous device ID** (still no auth). See **Key Technical Decisions** point 4.
+> **Revision (2026-05-31):** The gallery gained a per-device **"My Rooms"** history alongside the
+> public community feed — keyed by an **anonymous device ID** (still no auth). Storage stays on
+> **Cloudinary**. See **Key Technical Decisions** point 4.
 
 ---
 
@@ -22,12 +22,12 @@
    network during the demo. (No standalone Expo Go build bakes in the keys.)
 4. **NEW — cloud storage + gallery, Community + My Rooms (scope addition, MongoDB showcase).** The
    original draft was session-only. We now persist every redesign to the cloud: **files (3 frames +
-   video) → Google Cloud Storage (GCS), metadata + URLs → MongoDB Atlas**, surfaced in the gallery —
+   video) → Cloudinary, metadata + URLs → MongoDB Atlas**, surfaced in the gallery —
    a **public community feed** (`/gallery`) every device sees, plus a per-device **"My Rooms"** history
    so each user can look back at their own sets. Identity is an **anonymous device ID** (a UUID kept in
    `AsyncStorage`) — **still no auth/login**; it just tags each redesign with an `ownerId` so "My Rooms"
    can filter. Chosen to qualify for the "best use of MongoDB" prize and for a stronger live demo. Files
-   never go in Mongo (no GridFS) — documents in Mongo, blobs in GCS. The final video can also be saved
+   never go in Mongo (no GridFS) — documents in Mongo, blobs in Cloudinary. The final video can also be saved
    to the phone's camera roll. See **Cloud Storage & Gallery** below.
 
 Also bumped: **Expo SDK 51 → 54**; `expo-video`, `expo-image-picker`, `expo-sharing`,
@@ -55,7 +55,7 @@ NativeWind v4 are all current.
    - Frame 2: AI-generated chaos/transition state (storyboard only)
    - Frame 3: AI-generated final redesign
 5. **Transition video** — **Frame 1 (start) + Frame 3 (end)** + a motion prompt are sent to Kling 3.0 (via eachlabs.ai). It animates from the real room to the final redesign as a 7-second clip; the motion prompt creates the chaotic mid-transformation between the two keyframes.
-6. **Result screen** — Shows the 3 frames as a storyboard strip and the full generated video below it. Save-to-camera-roll + share buttons. The redesign is automatically uploaded to GCS + MongoDB (tagged with the device's `ownerId`) and posted to the gallery.
+6. **Result screen** — Shows the 3 frames as a storyboard strip and the full generated video below it. Save-to-camera-roll + share buttons. The redesign is automatically uploaded to Cloudinary + MongoDB (tagged with the device's `ownerId`) and posted to the gallery.
 7. **Gallery** — A public community feed (from MongoDB) of everyone's redesigns, plus a **"My Rooms"** view filtered to this device's own `ownerId`; tap any one to replay its storyboard + video.
 
 ---
@@ -70,9 +70,9 @@ NativeWind v4 are all current.
 | Camera | `expo-image-picker` for native camera viewfinder |
 | Room analysis + image generation | Google Gemini **`gemini-3.1-flash-image-preview`** (Nano Banana 2 — native image output, paid/no free tier) |
 | Transition video | eachlabs.ai — **Kling 3.0 model, 7 seconds, start frame + end frame** (no multi-shot, no enhance) |
-| API layer | Expo API Routes to keep API keys + DB/GCS creds off the client (served by the running dev server) |
-| File storage | **Google Cloud Storage (GCS)** — public-read bucket holding the 3 frames + 7s video; returns public URLs |
-| Database / gallery | **MongoDB Atlas** — one document per redesign (ownerId, style, description, GCS URLs, createdAt); powers the community feed + per-device "My Rooms" |
+| API layer | Expo API Routes to keep API keys + DB/Cloudinary creds off the client (served by the running dev server) |
+| File storage | **Cloudinary** — the 3 frames + 7s video; returns CDN URLs |
+| Database / gallery | **MongoDB Atlas** — one document per redesign (ownerId, style, description, Cloudinary URLs, createdAt); powers the community feed + per-device "My Rooms" |
 | Identity | **Anonymous device ID** — a UUID in `AsyncStorage` (`expo-crypto`); no login, just tags redesigns so "My Rooms" can filter |
 | Save / share | `expo-media-library` (save to camera roll), `expo-sharing` (share sheet) |
 | Video playback | `expo-video` |
@@ -135,14 +135,12 @@ both a shared community feed and a per-device "My Rooms" history. This is also t
 - **Identity → anonymous device ID.** No login. On first launch the app generates a UUID
   (`expo-crypto`), stores it in `AsyncStorage`, and reuses it as `ownerId` on every save. This is what
   lets a user look back at *their own* redesigns. It is per-device — reinstalling the app resets it.
-- **Files → Google Cloud Storage (GCS).** The 3 frame images + the 7s video are uploaded to a
-  public-read GCS bucket (from a server-side API route), which returns public
-  `https://storage.googleapis.com/<bucket>/<key>` URLs that stream straight into `expo-video` /
-  `<Image>`. Files are **not** stored in MongoDB. No signed URLs (the gallery is public); no thumbnail
-  pipeline (serve the full image scaled down in the grid).
+- **Files → Cloudinary.** The 3 frame images + the 7s video are uploaded to Cloudinary (from a
+  server-side API route), which returns CDN URLs that stream straight into `expo-video` / `<Image>`.
+  Files are **not** stored in MongoDB.
 - **Metadata → MongoDB Atlas.** One document per redesign in a `redesigns` collection:
   `{ _id, ownerId, style, description, frameUrls[3], videoUrl, createdAt }`. Mongo stores *where* the
-  files are (GCS URLs), *whose* they are (`ownerId`), and the queryable metadata — the correct split
+  files are (Cloudinary URLs), *whose* they are (`ownerId`), and the queryable metadata — the correct split
   (documents in Mongo, blobs in object storage; no GridFS). Index `{ ownerId: 1, createdAt: -1 }`.
 - **Community feed.** `GET /api/gallery` shows **everyone's** redesigns, newest first
   (`find().sort({ createdAt: -1 })`). The feed fills up live as people use the app — a strong demo
@@ -150,7 +148,7 @@ both a shared community feed and a per-device "My Rooms" history. This is also t
 - **My Rooms.** `GET /api/gallery?owner=<ownerId>` returns just this device's redesigns
   (`find({ ownerId }).sort({ createdAt: -1 })`) — the personal "look back" history.
 - **Persistence flow.** On generation-complete the client calls `POST /api/save-redesign` with its
-  `ownerId` (uploads files to GCS, inserts the Mongo document). Non-blocking: if it fails, the user
+  `ownerId` (uploads files to Cloudinary, inserts the Mongo document). Non-blocking: if it fails, the user
   still sees their result.
 - **Camera roll.** On the result screen the user can also **save the video to the phone's camera
   roll** via `expo-media-library` (asks permission once).
@@ -198,8 +196,8 @@ both a shared community feed and a per-device "My Rooms" history. This is also t
 - A toggle switches two views from MongoDB, newest first:
   - **Community** (`GET /api/gallery`) — **everyone's** redesigns
   - **My Rooms** (`GET /api/gallery?owner=<ownerId>`) — just this device's own redesigns
-- Grid of cards (GCS image scaled down + style + date)
-- Tap a redesign → replay its full storyboard strip + video from GCS URLs
+- Grid of cards (Cloudinary thumbnail + style + date)
+- Tap a redesign → replay its full storyboard strip + video from Cloudinary URLs
 - Pull-to-refresh; empty state before any redesigns exist (My Rooms is empty until this device saves one)
 - No auth — identity is an anonymous device ID, so "My Rooms" is per-device (resets on reinstall); the community feed is public. No delete in MVP.
 
@@ -208,7 +206,7 @@ both a shared community feed and a per-device "My Rooms" history. This is also t
 ## Team Split (4 people, 24 hours)
 
 > 2 of the 4 are more technical; they own the API integrations and the shared scaffolds
-> (RoomContext shape, MongoDB/GCS layer, device-ID identity, API route contracts) so the other two can build
+> (RoomContext shape, MongoDB/Cloudinary layer, device-ID identity, API route contracts) so the other two can build
 > screens against typed seams from hour one.
 
 | Person | Responsibility |
@@ -216,8 +214,8 @@ both a shared community feed and a per-device "My Rooms" history. This is also t
 | 1 | Camera screen + image picker + `/scan` flow |
 | 2 | Home, style picker, result screen, **community gallery screen** UI |
 | 3 (technical) | Gemini API integration (Frame 2 + Frame 3 generation, 4-iteration selection) |
-| 4 (technical) | Video API (Kling 3.0, 7s) + video playback + **MongoDB + GCS layer** (`save-redesign`, `gallery` routes, device-ID `ownerId` plumbing) |
-| Tech lead | Floating — owns shared scaffolds (RoomContext, MongoDB/GCS modules, device-ID identity, API route contracts), unblocks everyone, owns the riskiest path (video generation) |
+| 4 (technical) | Video API (Kling 3.0, 7s) + video playback + **MongoDB + Cloudinary layer** (`save-redesign`, `gallery` routes, device-ID `ownerId` plumbing) |
+| Tech lead | Floating — owns shared scaffolds (RoomContext, MongoDB/Cloudinary modules, device-ID identity, API route contracts), unblocks everyone, owns the riskiest path (video generation) |
 
 ---
 
@@ -227,13 +225,13 @@ both a shared community feed and a per-device "My Rooms" history. This is also t
 GEMINI_API_KEY=
 EACHLABS_API_KEY=
 MONGODB_URI=
-GCS_BUCKET=
-GOOGLE_APPLICATION_CREDENTIALS=   # path to the GCS service-account JSON key (gitignored)
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
 ```
 
 Store in `.env` at project root. Access via `process.env.*` in API routes only. The `MONGODB_URI`
-and the GCS service-account credentials must never reach the client — all DB and upload work happens
-in `/app/api/`.
+and Cloudinary secrets must never reach the client — all DB and upload work happens in `/app/api/`.
 
 ---
 
@@ -244,21 +242,21 @@ npx create-expo-app reroom
 cd reroom
 npx expo install expo-image-picker expo-video expo-sharing nativewind \
   expo-media-library @react-native-async-storage/async-storage expo-crypto
-# server-side deps for the API routes (MongoDB + GCS):
-npm install mongodb @google-cloud/storage
+# server-side deps for the API routes (MongoDB + Cloudinary):
+npm install mongodb cloudinary
 ```
 
-Set up a free **MongoDB Atlas** cluster and a **Google Cloud Storage** bucket (public-read) with a
-service-account key; put their credentials in `.env` (see Environment Variables). Everyone installs
-**Expo Go** on their phones. Run `npx expo start`, scan the QR code, app is live. **Keep the dev
-server running** — the API routes (which talk to Gemini, eachlabs, MongoDB, and GCS) are served by it.
+Set up a free **MongoDB Atlas** cluster and a free **Cloudinary** account; put their credentials in
+`.env` (see Environment Variables). Everyone installs **Expo Go** on their phones. Run
+`npx expo start`, scan the QR code, app is live. **Keep the dev server running** — the API routes
+(which talk to Gemini, eachlabs, MongoDB, and Cloudinary) are served by it.
 
 ---
 
 ## MVP Constraints (24hr scope)
 
 - iOS and Android via Expo Go — no need for a production build during the hackathon
-- No user accounts / no auth — but redesigns **are** persisted to the cloud (MongoDB Atlas + GCS) and shown in the gallery: a public community feed + a per-device "My Rooms" history keyed by an anonymous device ID (see Cloud Storage & Gallery)
+- No user accounts / no auth — but redesigns **are** persisted to the cloud (MongoDB Atlas + Cloudinary) and shown in the gallery: a public community feed + a per-device "My Rooms" history keyed by an anonymous device ID (see Cloud Storage & Gallery)
 - No real-time room scanning — a single photo is enough
 - If video generation takes >60s, show a "still rendering" state with an animated progress indicator
 - Error states: if any API fails, show a friendly message and a retry button. Cloud-save failures are non-blocking — the user still sees their video.
