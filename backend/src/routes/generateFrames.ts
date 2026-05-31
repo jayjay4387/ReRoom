@@ -1,5 +1,19 @@
 import { Request, Response } from 'express';
+import { v2 as cloudinary } from 'cloudinary';
 import { chaosPrompt, finalDesignPrompt, QuestionnaireAnswers } from '../prompts';
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+async function uploadToCloudinary(base64: string): Promise<string> {
+  const result = await cloudinary.uploader.upload(`data:image/jpeg;base64,${base64}`, {
+    folder: 'reroom/frames',
+  });
+  return result.secure_url;
+}
 
 async function generateCandidates(imageBase64: string, prompt: string, count: number): Promise<string[]> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -41,9 +55,14 @@ export async function generateFrames(req: Request, res: Response): Promise<void>
   }
 
   try {
-    const [chaosFrameCandidates, finalFrameCandidates] = await Promise.all([
+    const [chaosBase64s, finalBase64s] = await Promise.all([
       generateCandidates(imageBase64, chaosPrompt(answers), 4),
       generateCandidates(imageBase64, finalDesignPrompt(answers), 4),
+    ]);
+
+    const [chaosFrameCandidates, finalFrameCandidates] = await Promise.all([
+      Promise.all(chaosBase64s.map(uploadToCloudinary)),
+      Promise.all(finalBase64s.map(uploadToCloudinary)),
     ]);
 
     res.json({ chaosFrameCandidates, finalFrameCandidates, description: '' });
