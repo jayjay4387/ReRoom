@@ -43,19 +43,12 @@ export default function GeneratingScreen() {
       if (!framesRes.ok) throw new Error(`generate-frames ${framesRes.status}`);
       const frames = await framesRes.json();
 
-      // Backend returns 4 candidates per frame (Cloudinary URLs) + the hosted original.
-      // Take the first candidate for now — no in-app chooser yet.
+      // Backend returns { originalUrl, redesignUrl, description }
       const originalUrl: string | undefined = frames.originalUrl;
-      const chaosUrl: string | undefined = frames.chaosFrameCandidates?.[0];
-      const finalUrl: string | undefined = frames.finalFrameCandidates?.[0];
+      const finalUrl: string | undefined = frames.redesignUrl;
       if (!originalUrl || !finalUrl) throw new Error('generate-frames returned no usable frames');
 
       setStep(2);
-      if (chaosUrl) {
-        setChaosPreview(chaosUrl);
-        setChaosFrame(chaosUrl);
-      }
-
       setStep(3);
       setFinalPreview(finalUrl);
       setFinalFrame(finalUrl);
@@ -63,19 +56,18 @@ export default function GeneratingScreen() {
       setDescription(frames.description ?? '');
 
       setStep(4);
-      // Higgsfield Kling 3.0 animates the original room (cluttered -> organized) from one image.
-      // This call blocks until the video is rendered (the backend polls Higgsfield).
+      // Kling 3.0: original photo as start frame, Gemini redesign as end frame.
       const videoRes = await fetch(apiUrl('/api/generate-video'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl: originalUrl }),
+        body: JSON.stringify({ startFrameUrl: originalUrl, endFrameUrl: finalUrl }),
       });
       if (!videoRes.ok) throw new Error(`generate-video ${videoRes.status}`);
       const { videoUrl } = await videoRes.json();
       setVideoUrl(videoUrl);
 
       // Persist to the gallery — non-blocking: the user still sees their result if this fails.
-      saveRedesign({ originalUrl, chaosUrl, finalUrl, videoUrl, style, description: frames.description ?? '' })
+      saveRedesign({ originalUrl, finalUrl, videoUrl, style, description: frames.description ?? '' })
         .catch((err) => console.warn('[save-redesign] failed (non-blocking):', err));
 
       router.push('/result');
