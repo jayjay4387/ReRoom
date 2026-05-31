@@ -6,7 +6,7 @@ import { submitVideo, pollVideo } from './routes/generateVideo';
 import { saveRedesign } from './routes/saveRedesign';
 import { getGallery } from './routes/gallery';
 
-dotenv.config({ path: '../../.env' });
+dotenv.config({ path: '../.env' });
 
 const app = express();
 app.use(cors());
