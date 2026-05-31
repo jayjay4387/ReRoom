@@ -37,7 +37,7 @@ RoomRevamp-RR-/
 │
 ├── documents/                       # PRD and design docs
 ├── workflows/                       # CLAUDE.md workflow config
-├── .env                             # GEMINI_API_KEY, EACHLABS_API_KEY (never commit)
+├── .env                             # GEMINI_API_KEY, EACHLABS_API_KEY, MONGODB_URI, GCS creds (never commit)
 └── .gitignore
 ```
 
@@ -53,6 +53,10 @@ RoomRevamp-RR-/
 | Backend  | Node.js, Express, TypeScript          |
 | AI Image | Google Gemini (gemini-3.1-flash-image-preview) |
 | AI Video | Higgsfield via eachlabs.ai (Kling 3.0, 7s) |
+| Storage  | Google Cloud Storage (GCS) — 3 frames + 7s video, public URLs |
+| Database | MongoDB Atlas — one doc per redesign (metadata + GCS URLs) |
+| Gallery  | Public community feed + per-device "My Rooms" |
+| Identity | Anonymous device ID (UUID in AsyncStorage) — no login |
 
 ---
 
@@ -64,6 +68,11 @@ RoomRevamp-RR-/
 # .env
 GEMINI_API_KEY=your_key_here
 EACHLABS_API_KEY=your_key_here
+
+# cloud storage + gallery layer (MongoDB + GCS)
+MONGODB_URI=your_atlas_uri_here
+GCS_BUCKET=your_bucket_name_here
+GOOGLE_APPLICATION_CREDENTIALS=./gcs-service-account.json   # gitignored
 ```
 
 ### 2. Start the backend

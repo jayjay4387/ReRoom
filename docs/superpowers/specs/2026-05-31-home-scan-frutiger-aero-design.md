@@ -17,7 +17,7 @@ Establish the MVP frontend's **navigation shell** and **"Sky Glass" Frutiger Aer
 
 **Out of scope (now)**
 - Style / Generating / Result keep their existing implementation; re-skinning them is a follow-up.
-- Gallery backend (MongoDB/Cloudinary) and the real feed.
+- Gallery backend (MongoDB/GCS — community feed + per-device "My Rooms" via anonymous device ID) and the real feed.
 - Frontend→backend API wiring (separate ticket). Scan only saves to `RoomContext` and navigates.
 
 ## 2. Constraints
