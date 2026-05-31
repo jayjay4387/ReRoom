@@ -18,7 +18,6 @@ const HILL_BACK_TOP = '#9FE06A';
 const HILL_BACK_BOTTOM = '#6FBE3F';
 const HILL_FRONT_TOP = '#7CCD44';
 const HILL_FRONT_BOTTOM = '#2E7D24';
-const BLADE_GREEN = '#B6EE7A';
 const HILLTOP_HIGHLIGHT = 'rgba(220,255,180,0.7)';
 
 const GRASS_H = 120;
@@ -29,39 +28,12 @@ const BACK_HILL = `M0 ${GRASS_H} L0 52 ` +
   `S ${width} 36, ${width} 50 ` +
   `L ${width} ${GRASS_H} Z`;
 
-// Front hill: lower/forward crest for depth, baseline of the grass blades.
+// Front hill: lower/forward crest for depth.
 const FRONT_CREST_Y = 78;
 const FRONT_HILL = `M0 ${GRASS_H} L0 ${FRONT_CREST_Y} ` +
   `C ${width * 0.22} ${FRONT_CREST_Y - 22}, ${width * 0.4} ${FRONT_CREST_Y + 10}, ${width * 0.6} ${FRONT_CREST_Y - 6} ` +
   `S ${width * 0.9} ${FRONT_CREST_Y - 18}, ${width} ${FRONT_CREST_Y - 4} ` +
   `L ${width} ${GRASS_H} Z`;
-
-// A point along the smooth front crest (cubic-ish approximation) so blades sit on it.
-function frontCrestY(x: number): number {
-  const t = x / width;
-  // Smooth-ish undulation matching the curve above, plus tiny jitter for life.
-  const wave = Math.sin(t * Math.PI * 1.6) * 9 + Math.sin(t * Math.PI * 4.3) * 3;
-  return FRONT_CREST_Y - 6 - wave;
-}
-
-// Build a single Path of triangular grass tufts across the front hilltop.
-const BLADE_COUNT = 30;
-function buildBlades(): string {
-  let d = '';
-  const step = width / BLADE_COUNT;
-  for (let i = 0; i <= BLADE_COUNT; i++) {
-    const baseX = i * step;
-    const baseY = frontCrestY(baseX);
-    const lean = (i % 3) - 1; // -1, 0, 1 alternating lean
-    const halfW = step * 0.34;
-    const h = 9 + (i % 4) * 3; // 9..18 px tall blades
-    const tipX = baseX + lean * 2.5;
-    // Triangle: left base -> tip -> right base
-    d += `M ${baseX - halfW} ${baseY} L ${tipX} ${baseY - h} L ${baseX + halfW} ${baseY} Z `;
-  }
-  return d.trim();
-}
-const BLADES = buildBlades();
 
 // Thin sunlit highlight tracing the front crest.
 const FRONT_HIGHLIGHT = `M0 ${FRONT_CREST_Y} ` +
@@ -98,12 +70,7 @@ export default function SkyBackground({ children }: { children: ReactNode }) {
         pointerEvents="none"
       />
 
-      <Svg
-        style={styles.meadow}
-        width={width}
-        height={GRASS_H}
-        pointerEvents="none"
-      >
+      <Svg style={styles.meadow} width={width} height={GRASS_H} pointerEvents="none">
         <Defs>
           <SvgLG id="hillBack" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0" stopColor={HILL_BACK_TOP} />
@@ -122,15 +89,7 @@ export default function SkyBackground({ children }: { children: ReactNode }) {
         <Path d={FRONT_HILL} fill="url(#hillFront)" />
 
         {/* Sunlit highlight along the front crest */}
-        <Path
-          d={FRONT_HIGHLIGHT}
-          stroke={HILLTOP_HIGHLIGHT}
-          strokeWidth={2}
-          fill="none"
-        />
-
-        {/* Grass blades / tufts so the silhouette reads as grass */}
-        <Path d={BLADES} fill={BLADE_GREEN} opacity={0.95} />
+        <Path d={FRONT_HIGHLIGHT} stroke={HILLTOP_HIGHLIGHT} strokeWidth={2} fill="none" />
       </Svg>
 
       <View style={styles.content}>{children}</View>
