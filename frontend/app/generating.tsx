@@ -6,6 +6,8 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import Alert01Icon from '@hugeicons/core-free-icons/Alert01Icon';
 import SkyBackground from '../components/aero/SkyBackground';
 import { GlassButtonGhost } from '../components/aero/GlassButton';
+import { apiUrl } from '../lib/api';
+import { saveRedesign } from '../lib/redesigns';
 import ProgressSteps from '../components/ProgressSteps';
 import { useRoom } from '../context/RoomContext';
 import { GLASS } from '../constants/theme';
@@ -19,7 +21,7 @@ const STEPS = [
 
 export default function GeneratingScreen() {
   const router = useRouter();
-  const { photo, style, setChaosFrame, setFinalFrame, setVideoUrl, setDescription } = useRoom();
+  const { photo, style, setChaosFrame, setFinalFrame, setOriginalUrl, setVideoUrl, setDescription } = useRoom();
   const [step, setStep] = useState(0);
   const [chaosPreview, setChaosPreview] = useState<string | null>(null);
   const [finalPreview, setFinalPreview] = useState<string | null>(null);
@@ -30,54 +32,56 @@ export default function GeneratingScreen() {
   const run = async () => {
     try {
       setStep(1);
-      const framesRes = await fetch('/api/generate-frames', {
+      const framesRes = await fetch(apiUrl('/api/generate-frames'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: photo?.base64, style }),
+        body: JSON.stringify({
+          imageBase64: photo?.base64,
+          answers: { vibe: style, usage: '', color: '', material: '', transformationLevel: 'full' },
+        }),
       });
       if (!framesRes.ok) throw new Error(`generate-frames ${framesRes.status}`);
       const frames = await framesRes.json();
 
+      // Backend returns 4 candidates per frame (Cloudinary URLs) + the hosted original.
+      // Take the first candidate for now — no in-app chooser yet.
+      const originalUrl: string | undefined = frames.originalUrl;
+      const chaosUrl: string | undefined = frames.chaosFrameCandidates?.[0];
+      const finalUrl: string | undefined = frames.finalFrameCandidates?.[0];
+      if (!originalUrl || !finalUrl) throw new Error('generate-frames returned no usable frames');
+
       setStep(2);
-      setChaosPreview(frames.chaosFrame);
-      setChaosFrame(frames.chaosFrame);
+      if (chaosUrl) {
+        setChaosPreview(chaosUrl);
+        setChaosFrame(chaosUrl);
+      }
 
       setStep(3);
-      setFinalPreview(frames.finalFrame);
-      setFinalFrame(frames.finalFrame);
-      setDescription(frames.description);
+      setFinalPreview(finalUrl);
+      setFinalFrame(finalUrl);
+      setOriginalUrl(originalUrl);
+      setDescription(frames.description ?? '');
 
       setStep(4);
-      const videoRes = await fetch('/api/generate-video', {
+      // Higgsfield Kling 3.0 animates the original room (cluttered -> organized) from one image.
+      // This call blocks until the video is rendered (the backend polls Higgsfield).
+      const videoRes = await fetch(apiUrl('/api/generate-video'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          frame1Base64: photo?.base64,
-          frame2Base64: frames.chaosFrame,
-          frame3Base64: frames.finalFrame,
-        }),
+        body: JSON.stringify({ imageUrl: originalUrl }),
       });
       if (!videoRes.ok) throw new Error(`generate-video ${videoRes.status}`);
-      const { jobId } = await videoRes.json();
-
-      const videoUrl = await pollVideo(jobId);
+      const { videoUrl } = await videoRes.json();
       setVideoUrl(videoUrl);
+
+      // Persist to the gallery — non-blocking: the user still sees their result if this fails.
+      saveRedesign({ originalUrl, chaosUrl, finalUrl, videoUrl, style, description: frames.description ?? '' })
+        .catch((err) => console.warn('[save-redesign] failed (non-blocking):', err));
+
       router.push('/result');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Something went wrong');
     }
-  };
-
-  const pollVideo = async (jobId: string): Promise<string> => {
-    const start = Date.now();
-    while (Date.now() - start < 120_000) {
-      await new Promise((r) => setTimeout(r, 3000));
-      const res = await fetch(`/api/generate-video?jobId=${jobId}`);
-      const data = await res.json();
-      if (data.status === 'complete') return data.videoUrl;
-      if (data.status === 'error') throw new Error('Video generation failed');
-    }
-    throw new Error('This is taking longer than expected');
   };
 
   if (error) {
@@ -114,13 +118,13 @@ export default function GeneratingScreen() {
           </BlurView>
         </View>
 
-        {/* Frame thumbnails — fade in as each arrives */}
+        {/* Frame thumbnails — fade in as each arrives (Cloudinary URLs) */}
         {(chaosPreview || finalPreview) && (
           <View style={styles.thumbRow}>
             {chaosPreview && (
               <View style={styles.thumbFrame}>
                 <Image
-                  source={{ uri: `data:image/jpeg;base64,${chaosPreview}` }}
+                  source={{ uri: chaosPreview }}
                   style={styles.thumb}
                   resizeMode="cover"
                 />
@@ -129,7 +133,7 @@ export default function GeneratingScreen() {
             {finalPreview && (
               <View style={styles.thumbFrame}>
                 <Image
-                  source={{ uri: `data:image/jpeg;base64,${finalPreview}` }}
+                  source={{ uri: finalPreview }}
                   style={styles.thumb}
                   resizeMode="cover"
                 />

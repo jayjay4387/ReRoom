@@ -12,6 +12,8 @@ type RoomContextType = {
   setChaosFrame: (frame: string) => void;
   finalFrame: string | null;
   setFinalFrame: (frame: string) => void;
+  originalUrl: string | null;
+  setOriginalUrl: (url: string) => void;
   videoUrl: string | null;
   setVideoUrl: (url: string) => void;
   description: string | null;
@@ -26,6 +28,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   const [style, setStyle] = useState<Style | null>(null);
   const [chaosFrame, setChaosFrame] = useState<string | null>(null);
   const [finalFrame, setFinalFrame] = useState<string | null>(null);
+  const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [description, setDescription] = useState<string | null>(null);
 
@@ -34,13 +37,14 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     setStyle(null);
     setChaosFrame(null);
     setFinalFrame(null);
+    setOriginalUrl(null);
     setVideoUrl(null);
     setDescription(null);
   };
 
   return (
     <RoomContext.Provider
-      value={{ photo, setPhoto, style, setStyle, chaosFrame, setChaosFrame, finalFrame, setFinalFrame, videoUrl, setVideoUrl, description, setDescription, reset }}
+      value={{ photo, setPhoto, style, setStyle, chaosFrame, setChaosFrame, finalFrame, setFinalFrame, originalUrl, setOriginalUrl, videoUrl, setVideoUrl, description, setDescription, reset }}
     >
       {children}
     </RoomContext.Provider>

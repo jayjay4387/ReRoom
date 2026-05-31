@@ -31,13 +31,13 @@ RoomRevamp-RR-/
 │   │   ├── index.ts                 # Server entry point (port 3000)
 │   │   └── routes/
 │   │       ├── generateFrames.ts    # POST /api/generate-frames — Gemini (4 candidates each frame)
-│   │       └── generateVideo.ts     # POST/GET /api/generate-video — Kling 3.0, 7s
+│   │       └── generateVideo.ts     # POST /api/generate-video — Higgsfield Kling 3.0 (single image), blocks until rendered
 │   ├── package.json
 │   └── tsconfig.json
 │
 ├── documents/                       # PRD and design docs
 ├── workflows/                       # CLAUDE.md workflow config
-├── .env                             # GEMINI_API_KEY, EACHLABS_API_KEY, MONGODB_URI, GCS creds (never commit)
+├── .env                             # GEMINI_API_KEY, HF_CREDENTIALS, MONGODB_URI, CLOUDINARY creds (never commit)
 └── .gitignore
 ```
 
@@ -52,9 +52,9 @@ RoomRevamp-RR-/
 | Video    | expo-video, expo-sharing              |
 | Backend  | Node.js, Express, TypeScript          |
 | AI Image | Google Gemini (gemini-3.1-flash-image-preview) |
-| AI Video | Higgsfield via eachlabs.ai (Kling 3.0, 7s) |
-| Storage  | Google Cloud Storage (GCS) — 3 frames + 7s video, public URLs |
-| Database | MongoDB Atlas — one doc per redesign (metadata + GCS URLs) |
+| AI Video | Higgsfield Kling 3.0 Pro (image-to-video, single frame, 7s) |
+| Storage  | Cloudinary — 3 frames + 7s video, CDN URLs |
+| Database | MongoDB Atlas — one doc per redesign (metadata + Cloudinary URLs) |
 | Gallery  | Public community feed + per-device "My Rooms" |
 | Identity | Anonymous device ID (UUID in AsyncStorage) — no login |
 
@@ -67,12 +67,13 @@ RoomRevamp-RR-/
 ```
 # .env
 GEMINI_API_KEY=your_key_here
-EACHLABS_API_KEY=your_key_here
+HF_CREDENTIALS=your_key_id:your_key_secret
 
-# cloud storage + gallery layer (MongoDB + GCS)
+# cloud storage + gallery layer (MongoDB + Cloudinary)
 MONGODB_URI=your_atlas_uri_here
-GCS_BUCKET=your_bucket_name_here
-GOOGLE_APPLICATION_CREDENTIALS=./gcs-service-account.json   # gitignored
+CLOUDINARY_CLOUD_NAME=your_cloud_name_here
+CLOUDINARY_API_KEY=your_key_here
+CLOUDINARY_API_SECRET=your_secret_here
 ```
 
 ### 2. Start the backend
