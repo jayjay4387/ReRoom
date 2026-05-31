@@ -1,6 +1,9 @@
+import { ComponentProps } from 'react';
 import { View, Text, Image, Pressable, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import ArrowLeft01Icon from '@hugeicons/core-free-icons/ArrowLeft01Icon';
 import Camera01Icon from '@hugeicons/core-free-icons/Camera01Icon';
@@ -8,10 +11,40 @@ import Image01Icon from '@hugeicons/core-free-icons/Image01Icon';
 import CheckmarkCircle01Icon from '@hugeicons/core-free-icons/CheckmarkCircle01Icon';
 import RefreshIcon from '@hugeicons/core-free-icons/RefreshIcon';
 import SkyBackground from '../components/aero/SkyBackground';
-import GlassCard from '../components/aero/GlassCard';
 import { GlassButtonPrimary, GlassButtonGhost } from '../components/aero/GlassButton';
 import { useRoom } from '../context/RoomContext';
-import { GLASS } from '../constants/theme';
+import { GLASS, CTA_GREEN } from '../constants/theme';
+
+type IconType = ComponentProps<typeof HugeiconsIcon>['icon'];
+
+function ActionCard({
+  icon,
+  label,
+  onPress,
+  accent,
+}: {
+  icon: IconType;
+  label: string;
+  onPress: () => void;
+  accent?: boolean;
+}) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.cardWrap, pressed && styles.pressed]}>
+      <BlurView intensity={28} tint="light" style={styles.actionCard}>
+        {accent ? (
+          <LinearGradient colors={CTA_GREEN} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.bubble}>
+            <HugeiconsIcon icon={icon} size={30} color="#ffffff" />
+          </LinearGradient>
+        ) : (
+          <View style={[styles.bubble, styles.bubbleNeutral]}>
+            <HugeiconsIcon icon={icon} size={30} color={GLASS.textDark} />
+          </View>
+        )}
+        <Text style={styles.actionLabel}>{label}</Text>
+      </BlurView>
+    </Pressable>
+  );
+}
 
 export default function ScanScreen() {
   const router = useRouter();
@@ -59,16 +92,13 @@ export default function ScanScreen() {
             </View>
           </>
         ) : (
-          <>
-            <GlassCard style={styles.vf}>
-              <HugeiconsIcon icon={Camera01Icon} size={32} color={GLASS.textDark} />
-              <Text style={styles.vtext}>Point at the room you want to redesign</Text>
-            </GlassCard>
-            <View style={styles.btns}>
-              <GlassButtonPrimary label="Take Photo" icon={Camera01Icon} onPress={() => pickFrom('camera')} />
-              <GlassButtonGhost label="Choose from gallery" icon={Image01Icon} onPress={() => pickFrom('library')} />
+          <View style={styles.empty}>
+            <Text style={styles.prompt}>Point at the room you want to redesign</Text>
+            <View style={styles.cardsRow}>
+              <ActionCard icon={Camera01Icon} label="Take Photo" accent onPress={() => pickFrom('camera')} />
+              <ActionCard icon={Image01Icon} label="Choose from gallery" onPress={() => pickFrom('library')} />
             </View>
-          </>
+          </View>
         )}
       </View>
     </SkyBackground>
@@ -89,8 +119,55 @@ const styles = StyleSheet.create({
   },
   htitle: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
   body: { flex: 1, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 36 },
-  vf: { width: '100%', height: 160 },
-  vtext: { fontSize: 11, color: GLASS.textDark, opacity: 0.85, textAlign: 'center', paddingHorizontal: 18 },
+
+  // empty state — two big action cards centered
+  empty: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 20 },
+  prompt: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#ffffff',
+    textAlign: 'center',
+    textShadowColor: 'rgba(20,80,140,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  cardsRow: { flexDirection: 'row', gap: 14, width: '100%' },
+  cardWrap: {
+    flex: 1,
+    borderRadius: 20,
+    shadowColor: '#143C5A',
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  pressed: { opacity: 0.9 },
+  actionCard: {
+    height: 168,
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: GLASS.border,
+    backgroundColor: GLASS.fill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+    paddingHorizontal: 10,
+  },
+  bubble: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#145A1E',
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  bubbleNeutral: { backgroundColor: 'rgba(255,255,255,0.55)', shadowColor: '#143C5A', shadowOpacity: 0.18 },
+  actionLabel: { fontSize: 13, fontWeight: '700', color: GLASS.textDark, textAlign: 'center' },
+
+  // preview state
   frame: {
     width: '100%',
     height: 320,
